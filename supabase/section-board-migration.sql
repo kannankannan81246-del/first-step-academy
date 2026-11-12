@@ -5,14 +5,8 @@ alter table public.students
   add column if not exists board_name text,
   add column if not exists section_name text;
 
-alter table public.staff_class_assignments
-  add column if not exists section_name text;
-
--- One staff member can be assigned to several sections, but not the same
--- section more than once.
-create unique index if not exists staff_class_assignments_staff_section_uidx
-  on public.staff_class_assignments (staff_id, section_name)
-  where section_name is not null;
+-- Staff section assignments reuse the existing class_name column and store
+-- values such as "Section A", preserving the table's existing unique key.
 
 -- Keep the existing roster view's original columns and append section_name.
 -- security_invoker ensures the querying user's table permissions/RLS apply.
