@@ -509,7 +509,7 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
         <div class="panel hidden" id="adminAchievements">
           <h3>Add Student Achievement</h3>
           <div class="fields">
-            <div class="field"><label>Student Name</label><input id="achievementStudent"></div>
+            <div class="field"><label>Select Student</label><select id="achievementStudent"><option value="">Select student</option></select></div>
             <div class="field"><label>Achievement Title</label><input id="achievementTitle"></div>
             <div class="field"><label>Date</label><input id="achievementDate" type="date"></div>
             <div class="field full"><label>Description</label><textarea id="achievementDescription" rows="3"></textarea></div>
@@ -985,6 +985,7 @@ async function loadStaff() {
   $('classSelect').innerHTML = sections.map(x =>
     '<option value="' + esc(x) + '">Section ' + esc(x) + '</option>'
   ).join('');
+  await loadOwnLeave('staff','staffLeaveHistory');
 }
 
 /* LOAD STUDENT ROSTER */
@@ -1113,8 +1114,9 @@ function renderLeaveRows(target, rows, adminMode=false) {
 async function loadAdminExtras() {
   const {data: leaves,error:le}=await db.from('leave_requests').select('*').order('created_at',{ascending:false});
   if(le) msg('dashMsg','Leave requests: '+le.message,true);
-  const {data: students}=await db.from('students').select('id,full_name,auth_user_id');
+  const {data: students}=await db.from('students').select('id,full_name,student_code').eq('active',true).order('full_name');
   const studentMap=Object.fromEntries((students||[]).map(s=>[s.id,s.full_name]));
+  $('achievementStudent').innerHTML='<option value="">Select student</option>'+(students||[]).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code||'')+'</option>').join('');
   renderLeaveRows('adminLeaveList',(leaves||[]).map(r=>({...r,student_name:studentMap[r.student_id]})),true);
 
   const {data:notices,error:ne}=await db.from('academy_notices').select('*').order('created_at',{ascending:false});
@@ -1170,9 +1172,11 @@ $('noticePublish').onclick=async()=>{
   await loadAdminExtras();
 };
 $('achievementSave').onclick=async()=>{
-  const studentName=$('achievementStudent').value.trim(),title=$('achievementTitle').value.trim();
-  if(!studentName||!title) return msg('dashMsg','Enter student name and achievement title.',true);
-  const {error}=await db.from('student_achievements').insert({student_name:studentName,title,description:$('achievementDescription').value.trim()||null,achievement_date:$('achievementDate').value||today,created_by:user.id});
+  const studentId=$('achievementStudent').value,title=$('achievementTitle').value.trim();
+  const studentOption=$('achievementStudent').selectedOptions[0];
+  const studentName=studentOption?studentOption.textContent.split(' · ')[0]:'';
+  if(!studentId||!title) return msg('dashMsg','Select a student and enter an achievement title.',true);
+  const {error}=await db.from('student_achievements').insert({student_id:studentId,student_name:studentName,title,description:$('achievementDescription').value.trim()||null,achievement_date:$('achievementDate').value||today,created_by:user.id});
   if(error) return msg('dashMsg',error.message,true);
   $('achievementStudent').value='';$('achievementTitle').value='';$('achievementDescription').value='';
   msg('dashMsg','Achievement saved.');
