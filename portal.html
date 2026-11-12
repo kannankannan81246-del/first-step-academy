@@ -495,6 +495,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         <!-- CLASS ASSIGNMENT -->
         <div class="panel hidden" id="assignments">
           <h3>Assign Sections to Staff</h3>
+          <p class="muted">Each staff member can handle one section only. Sections C (State Board) and D (CBSE) must have different staff members.</p>
 
           <div class="fields">
             <div class="field">
@@ -884,7 +885,7 @@ async function loadAdmin() {
       ['Staff', 'Section'],
       (assignments || []).map(a => [
         staffMap[a.staff_id] || a.staff_id,
-        a.class_name || 'Not assigned'
+        /^Section [A-D]$/.test(a.class_name || '') ? a.class_name : 'Needs section mapping (' + (a.class_name || 'Unassigned') + ')'
       ])
     );
   }
@@ -1002,24 +1003,57 @@ $('staffSave').onclick = async () => {
   }
 };
 
-/* ASSIGN CLASS */
+/* ASSIGN ONE SECTION TO EACH STAFF MEMBER */
 $('assignSave').onclick = async () => {
   const staffId = $('assignStaff').value;
   const section = $('assignSection').value;
+  const sectionName = 'Section ' + section;
 
   if (!staffId || !section) {
     return msg('dashMsg', 'Select staff and section.', true);
   }
 
-  const { error } = await db.from('staff_class_assignments').upsert({
-    staff_id: staffId,
-    class_name: 'Section ' + section
-  }, { onConflict: 'staff_id,class_name' });
+  const { data: currentAssignments, error: readError } = await db
+    .from('staff_class_assignments')
+    .select('staff_id,class_name');
 
-  if (error) {
-    msg('dashMsg', error.message, true);
+  if (readError) {
+    return msg('dashMsg', readError.message, true);
+  }
+
+  const occupied = (currentAssignments || []).find(
+    item => item.class_name === sectionName && item.staff_id !== staffId
+  );
+
+  if (occupied) {
+    return msg('dashMsg', sectionName + ' is already assigned to another staff member. Each section must have separate staff.', true);
+  }
+
+  const ownAssignments = (currentAssignments || []).filter(
+    item => item.staff_id === staffId
+  );
+
+  if (ownAssignments.length > 1) {
+    return msg('dashMsg', 'This staff member has multiple old assignments. Please ask the admin to review them before changing.', true);
+  }
+
+  let result;
+  if (ownAssignments.length === 1) {
+    result = await db
+      .from('staff_class_assignments')
+      .update({ class_name: sectionName })
+      .eq('staff_id', staffId)
+      .eq('class_name', ownAssignments[0].class_name);
   } else {
-    msg('dashMsg', 'Section assigned successfully.');
+    result = await db
+      .from('staff_class_assignments')
+      .insert({ staff_id: staffId, class_name: sectionName });
+  }
+
+  if (result.error) {
+    msg('dashMsg', result.error.message, true);
+  } else {
+    msg('dashMsg', 'Section assigned successfully. This staff member now has only this section.');
     await loadAdmin();
   }
 };
