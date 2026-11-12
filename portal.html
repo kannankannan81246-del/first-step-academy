@@ -355,7 +355,7 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
 
             <div class="field">
               <label>Class</label>
-              <select id="adClass">
+              <select id="adClass" required>
                 <option value="">Select Class</option>
                 <option>Class 1</option>
                 <option>Class 2</option>
@@ -370,6 +370,20 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
                 <option>Class 11</option>
                 <option>Class 12</option>
               </select>
+            </div>
+
+            <div class="field">
+              <label>Board</label>
+              <select id="adBoard" required>
+                <option value="">Select Board</option>
+                <option value="State Board">State Board</option>
+                <option value="CBSE">CBSE</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Section (Auto-assigned)</label>
+              <input id="adSection" readonly placeholder="Select class and board first">
             </div>
 
             <div class="field full">
@@ -433,7 +447,7 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
 
         <!-- CLASS ASSIGNMENT -->
         <div class="panel hidden" id="assignments">
-          <h3>Assign Classes to Staff</h3>
+          <h3>Assign Sections to Staff</h3>
 
           <div class="fields">
             <div class="field">
@@ -442,25 +456,17 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
             </div>
 
             <div class="field">
-              <label>Select Class</label>
-              <select id="assignClass">
-                <option>Class 1</option>
-                <option>Class 2</option>
-                <option>Class 3</option>
-                <option>Class 4</option>
-                <option>Class 5</option>
-                <option>Class 6</option>
-                <option>Class 7</option>
-                <option>Class 8</option>
-                <option>Class 9</option>
-                <option>Class 10</option>
-                <option>Class 11</option>
-                <option>Class 12</option>
+              <label>Select Section</label>
+              <select id="assignSection">
+                <option value="A">Section A · Classes 1–5</option>
+                <option value="B">Section B · Classes 6–7</option>
+                <option value="C">Section C · State Board 8–10</option>
+                <option value="D">Section D · CBSE 9–10</option>
               </select>
             </div>
           </div>
 
-          <button class="btn" id="assignSave">Assign Class</button>
+          <button class="btn" id="assignSave">Assign Section</button>
           <div id="assignRecords"></div>
         </div>
       </div>
@@ -468,12 +474,12 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
       <!-- STAFF DASHBOARD -->
       <div id="staffDash" class="hidden">
         <div class="panel">
-          <h3>My Assigned Classes</h3>
+          <h3>My Assigned Sections</h3>
           <p id="myClasses"></p>
 
           <div class="fields">
             <div class="field">
-              <label>Select Class</label>
+              <label>Select Section</label>
               <select id="classSelect"></select>
             </div>
 
@@ -536,6 +542,23 @@ function localDate() {
 }
 
 const today = localDate();
+function sectionFor(className, board) {
+  const n = Number(String(className || '').replace(/\D/g, ''));
+  if (!n || !board) return '';
+  if (n >= 1 && n <= 5) return 'A';
+  if (n >= 6 && n <= 7) return 'B';
+  if (n >= 8 && n <= 10 && board === 'State Board') return 'C';
+  if (n >= 9 && n <= 10 && board === 'CBSE') return 'D';
+  return '';
+}
+
+function updateAdmissionSection() {
+  const section = sectionFor($('adClass').value, $('adBoard').value);
+  $('adSection').value = section ? 'Section ' + section : '';
+}
+$('adClass').addEventListener('change', updateAdmissionSection);
+$('adBoard').addEventListener('change', updateAdmissionSection);
+
 
 
 
@@ -689,7 +712,7 @@ async function loadAdmin() {
 
   const { data: students, error } = await db
     .from('students')
-    .select('student_code,full_name,class_name,guardian_name,guardian_phone,active')
+    .select('student_code,full_name,class_name,board_name,section_name,guardian_name,guardian_phone,active')
     .order('full_name');
 
   if (error) {
@@ -697,11 +720,13 @@ async function loadAdmin() {
   } else {
     showTable(
       'studentsTable',
-      ['Code', 'Student', 'Class', 'Guardian', 'Contact', 'Active'],
+      ['Code', 'Student', 'Class', 'Board', 'Section', 'Guardian', 'Contact', 'Active'],
       (students || []).map(s => [
         s.student_code,
         s.full_name,
         s.class_name,
+        s.board_name || '—',
+        s.section_name || '—',
         s.guardian_name,
         s.guardian_phone,
         s.active ? 'Yes' : 'No'
@@ -735,7 +760,7 @@ async function loadAdmin() {
 
   const { data: assignments, error: assignmentError } = await db
     .from('staff_class_assignments')
-    .select('staff_id,class_name');
+    .select('staff_id,section_name');
 
   if (assignmentError) {
     msg('dashMsg', assignmentError.message, true);
@@ -746,10 +771,10 @@ async function loadAdmin() {
 
     showTable(
       'assignRecords',
-      ['Staff', 'Class'],
+      ['Staff', 'Section'],
       (assignments || []).map(a => [
         staffMap[a.staff_id] || a.staff_id,
-        a.class_name
+        a.section_name ? 'Section ' + a.section_name : 'Not assigned'
       ])
     );
   }
@@ -774,11 +799,13 @@ $('adSave').onclick = async () => {
   const name = $('adName').value.trim();
   const code = $('adCode').value.trim();
   const cls = $('adClass').value;
+  const board = $('adBoard').value;
+  const section = sectionFor(cls, board);
 
-  if (!name || !code || !cls) {
+  if (!name || !code || !cls || !board || !section) {
     return msg(
       'dashMsg',
-      'Student name, student code and class are required.',
+      'Enter student name, code, class and a valid board/section combination.',
       true
     );
   }
@@ -792,6 +819,8 @@ $('adSave').onclick = async () => {
     full_name: name,
     student_code: code,
     class_name: cls,
+    board_name: board,
+    section_name: section,
     date_of_birth: $('adDob').value || null,
     guardian_name: $('adGuardian').value.trim() || null,
     guardian_phone: $('adPhone').value.trim() || null,
@@ -813,6 +842,9 @@ $('adSave').onclick = async () => {
       'adPhone', 'adSubjects', 'adAddress', 'adPrevious'
     ].forEach(id => $(id).value = '');
 
+    $('adBoard').value = '';
+    $('adSection').value = '';
+    $('adClass').value = '';
     await loadAdmin();
   }
 };
@@ -845,21 +877,21 @@ $('staffSave').onclick = async () => {
 /* ASSIGN CLASS */
 $('assignSave').onclick = async () => {
   const staffId = $('assignStaff').value;
-  const cls = $('assignClass').value;
+  const section = $('assignSection').value;
 
-  if (!staffId || !cls) {
-    return msg('dashMsg', 'Select staff and class.', true);
+  if (!staffId || !section) {
+    return msg('dashMsg', 'Select staff and section.', true);
   }
 
   const { error } = await db.from('staff_class_assignments').upsert({
     staff_id: staffId,
-    class_name: cls
-  });
+    section_name: section
+  }, { onConflict: 'staff_id,section_name' });
 
   if (error) {
     msg('dashMsg', error.message, true);
   } else {
-    msg('dashMsg', 'Class assigned successfully.');
+    msg('dashMsg', 'Section assigned successfully.');
     await loadAdmin();
   }
 };
@@ -868,36 +900,36 @@ $('assignSave').onclick = async () => {
 async function loadStaff() {
   const { data, error } = await db
     .from('staff_class_assignments')
-    .select('class_name')
+    .select('section_name')
     .eq('staff_id', user.id);
 
   if (error) {
     return msg('dashMsg', error.message, true);
   }
 
-  const classes = (data || []).map(x => x.class_name);
+  const sections = [...new Set((data || []).map(x => x.section_name).filter(Boolean))];
 
-  $('myClasses').textContent = classes.length
-    ? classes.join(' · ')
-    : 'No classes assigned yet. Please contact the admin.';
+  $('myClasses').textContent = sections.length
+    ? sections.map(x => 'Section ' + x).join(' · ')
+    : 'No sections assigned yet. Please contact the admin.';
 
-  $('classSelect').innerHTML = classes.map(c =>
-    '<option>' + esc(c) + '</option>'
+  $('classSelect').innerHTML = sections.map(x =>
+    '<option value="' + esc(x) + '">Section ' + esc(x) + '</option>'
   ).join('');
 }
 
 /* LOAD STUDENT ROSTER */
 $('loadRoster').onclick = async () => {
-  const cls = $('classSelect').value;
+  const section = $('classSelect').value;
 
-  if (!cls) {
-    return msg('dashMsg', 'No assigned class available.', true);
+  if (!section) {
+    return msg('dashMsg', 'No assigned section available.', true);
   }
 
   const { data, error } = await db
     .from('student_roster')
-    .select('student_id,full_name,class_name')
-    .eq('class_name', cls)
+    .select('student_id,full_name,class_name,section_name')
+    .eq('section_name', section)
     .eq('active', true)
     .order('full_name');
 
@@ -927,7 +959,6 @@ $('saveRoster').onclick = async () => {
   }
 
   const date = $('classDate').value;
-  const cls = $('classSelect').value;
 
   if (!date) {
     return msg('dashMsg', 'Select an attendance date.', true);
@@ -935,7 +966,7 @@ $('saveRoster').onclick = async () => {
 
   const rows = rosterRows.map(s => ({
     student_id: s.student_id,
-    class_name: cls,
+    class_name: s.class_name,
     attendance_date: date,
     status: $('roster').querySelector(
       '[data-student="' + s.student_id + '"]'
