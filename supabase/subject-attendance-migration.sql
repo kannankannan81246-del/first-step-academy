@@ -45,12 +45,16 @@ grant execute on function private.is_assigned_subject(text) to authenticated;
 
 drop policy if exists staff_subject_assignments_admin_manage on public.staff_subject_assignments;
 drop policy if exists staff_subject_assignments_staff_read_own on public.staff_subject_assignments;
+drop policy if exists staff_subject_assignments_read on public.staff_subject_assignments;
 create policy staff_subject_assignments_read on public.staff_subject_assignments
 for select to authenticated using(private.is_academy_admin() or staff_id=(select auth.uid()));
+drop policy if exists staff_subject_assignments_admin_insert on public.staff_subject_assignments;
 create policy staff_subject_assignments_admin_insert on public.staff_subject_assignments
 for insert to authenticated with check(private.is_academy_admin());
+drop policy if exists staff_subject_assignments_admin_update on public.staff_subject_assignments;
 create policy staff_subject_assignments_admin_update on public.staff_subject_assignments
 for update to authenticated using(private.is_academy_admin()) with check(private.is_academy_admin());
+drop policy if exists staff_subject_assignments_admin_delete on public.staff_subject_assignments;
 create policy staff_subject_assignments_admin_delete on public.staff_subject_assignments
 for delete to authenticated using(private.is_academy_admin());
 
@@ -67,6 +71,7 @@ drop policy if exists "student read own attendance" on public.attendance;
 drop policy if exists staff_read_own_attendance_for_upsert on public.attendance;
 drop policy if exists staff_update_own_assigned_attendance on public.attendance;
 
+drop policy if exists attendance_select_scoped on public.attendance;
 create policy attendance_select_scoped on public.attendance
 for select to authenticated using (
   private.is_academy_admin()
@@ -74,6 +79,7 @@ for select to authenticated using (
   or exists(select 1 from public.students s where s.id=attendance.student_id and s.auth_user_id=(select auth.uid()))
 );
 
+drop policy if exists attendance_insert_scoped on public.attendance;
 create policy attendance_insert_scoped on public.attendance
 for insert to authenticated with check (
   private.is_academy_admin()
@@ -98,6 +104,7 @@ for insert to authenticated with check (
   )
 );
 
+drop policy if exists attendance_update_scoped on public.attendance;
 create policy attendance_update_scoped on public.attendance
 for update to authenticated
 using(private.is_academy_admin() or marked_by=(select auth.uid()))
@@ -123,6 +130,7 @@ with check (
     )
   )
 );
+drop policy if exists attendance_delete_admin on public.attendance;
 create policy attendance_delete_admin on public.attendance
 for delete to authenticated using(private.is_academy_admin());
 grant select,insert,update,delete on public.attendance to authenticated;
