@@ -1069,7 +1069,7 @@ async function loadStaff() {
     return msg('dashMsg', error.message, true);
   }
 
-  const sections = [...new Set((data || []).map(x => String(x.class_name || '').replace(/^Section\\s+/i, '')).filter(x => /^[A-D]$/.test(x)))];
+  const sections = [...new Set((data || []).map(x => String(x.class_name || '').replace(/^Section\s+/i, '')).filter(x => /^[A-D]$/.test(x)))];
 
   $('myClasses').textContent = sections.length
     ? sections.map(x => 'Section ' + x).join(' · ')
