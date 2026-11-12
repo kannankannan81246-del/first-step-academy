@@ -562,6 +562,10 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
       <div id="studentDash" class="hidden">
 
         <div class="panel">
+          <h3>My Profile</h3>
+          <div class="grid" id="studentProfile"></div>
+        </div>
+        <div class="panel">
           <h3>My Attendance Summary</h3>
           <div class="grid" id="studentSummary"></div>
         </div>
@@ -1059,7 +1063,7 @@ $('saveRoster').onclick = async () => {
 async function loadStudent() {
   const { data: student, error } = await db
     .from('students')
-    .select('id,student_code,class_name')
+    .select('id,student_code,full_name,class_name,board_name,section_name')
     .eq('auth_user_id', user.id)
     .single();
 
@@ -1070,6 +1074,12 @@ async function loadStudent() {
       true
     );
   }
+
+  $('studentProfile').innerHTML = [
+    ['Student Name',student.full_name],['Student Code',student.student_code],
+    ['Class',student.class_name],['Board',student.board_name||'—'],
+    ['Section',student.section_name?'Section '+student.section_name:'—']
+  ].map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b style="font-size:1.05rem">'+esc(x[1])+'</b></div>').join('');
 
   const { data: rows, error: attendanceError } = await db
     .from('attendance')
