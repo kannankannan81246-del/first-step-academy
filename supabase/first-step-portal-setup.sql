@@ -125,6 +125,8 @@ create table if not exists public.portal_notifications (
 );
 create index if not exists portal_notifications_recipient_created_idx on public.portal_notifications(recipient_user_id,created_at desc);
 create index if not exists portal_notifications_related_leave_id_idx on public.portal_notifications(related_leave_id);
+create index if not exists attendance_marked_by_idx on public.attendance(marked_by);
+create index if not exists staff_attendance_marked_by_idx on public.staff_attendance(marked_by);
 
 alter table public.leave_requests enable row level security;
 alter table public.academy_notices enable row level security;
