@@ -760,7 +760,7 @@ async function loadAdmin() {
 
   const { data: assignments, error: assignmentError } = await db
     .from('staff_class_assignments')
-    .select('staff_id,section_name');
+    .select('staff_id,class_name');
 
   if (assignmentError) {
     msg('dashMsg', assignmentError.message, true);
@@ -774,7 +774,7 @@ async function loadAdmin() {
       ['Staff', 'Section'],
       (assignments || []).map(a => [
         staffMap[a.staff_id] || a.staff_id,
-        a.section_name ? 'Section ' + a.section_name : 'Not assigned'
+        a.class_name || 'Not assigned'
       ])
     );
   }
@@ -885,8 +885,8 @@ $('assignSave').onclick = async () => {
 
   const { error } = await db.from('staff_class_assignments').upsert({
     staff_id: staffId,
-    section_name: section
-  }, { onConflict: 'staff_id,section_name' });
+    class_name: 'Section ' + section
+  }, { onConflict: 'staff_id,class_name' });
 
   if (error) {
     msg('dashMsg', error.message, true);
@@ -900,14 +900,14 @@ $('assignSave').onclick = async () => {
 async function loadStaff() {
   const { data, error } = await db
     .from('staff_class_assignments')
-    .select('section_name')
+    .select('class_name')
     .eq('staff_id', user.id);
 
   if (error) {
     return msg('dashMsg', error.message, true);
   }
 
-  const sections = [...new Set((data || []).map(x => x.section_name).filter(Boolean))];
+  const sections = [...new Set((data || []).map(x => String(x.class_name || '').replace(/^Section\\s+/i, '')).filter(x => /^[A-D]$/.test(x)))];
 
   $('myClasses').textContent = sections.length
     ? sections.map(x => 'Section ' + x).join(' · ')
