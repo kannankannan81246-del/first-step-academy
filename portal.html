@@ -191,6 +191,24 @@ footer {
   .field.full { grid-column:auto; }
 }
 
+/* APPROVED NAVY / WHITE / GOLD PORTAL THEME */
+:root{
+  --navy:#102541;--teal:#b58a3a;--ink:#243247;--muted:#718096;
+  --paper:#f4f6f9;--line:#e7e1d5;
+}
+body{font-family:Inter,"Segoe UI",Arial,sans-serif;background:linear-gradient(180deg,#f5f3ee 0,#f7f8fa 330px);color:var(--ink)}
+header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)}
+.logo{background:linear-gradient(135deg,#c7a45e,#9b742e);box-shadow:0 7px 16px rgba(181,138,58,.2)}
+.tag{color:#9b742e}
+.btn{background:linear-gradient(135deg,#c7a45e,#9b742e);box-shadow:0 6px 14px rgba(181,138,58,.2)}
+.btn:hover{box-shadow:0 9px 20px rgba(181,138,58,.24)}
+.btn.secondary{background:var(--navy)}
+.tabs button.active{background:var(--navy);border:1px solid var(--navy)}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#b58a3a;box-shadow:0 0 0 3px rgba(181,138,58,.13)}
+.stat{background:linear-gradient(145deg,#f7f2e8,#fff);border:1px solid #eee2c9}
+.notice{background:#f7f2e8;color:#72551e;border:1px solid #eee2c9}
+.error{background:#fff0ee;color:#a02b20;border-color:#f4d6d2}
+#dashboard>.panel:first-child{background:linear-gradient(120deg,#102541,#1b3a5b)}
 /* PORTAL VISUAL REFRESH */
 :root{
   --navy:#102541;--teal:#159b8d;--ink:#1e2e43;--muted:#718096;
@@ -321,6 +339,9 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
           <button data-tab="staffAttendance">Staff Attendance</button>
           <button data-tab="studentsList">Students</button>
           <button data-tab="assignments">Class Assignments</button>
+          <button data-tab="adminLeaves">Leave Requests</button>
+          <button data-tab="adminNotices">Notices</button>
+          <button data-tab="adminAchievements">Achievements</button>
         </div>
 
         <!-- ADMISSION -->
@@ -468,6 +489,33 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
 
           <button class="btn" id="assignSave">Assign Section</button>
           <div id="assignRecords"></div>
+        <div class="panel hidden" id="adminLeaves">
+          <h3>Leave Requests</h3>
+          <p class="muted">Review student and staff leave requests.</p>
+          <div id="adminLeaveList"></div>
+        </div>
+
+        <div class="panel hidden" id="adminNotices">
+          <h3>Publish a Notice</h3>
+          <div class="fields">
+            <div class="field"><label>Notice Title</label><input id="noticeTitle"></div>
+            <div class="field"><label>Audience</label><select id="noticeAudience"><option value="all">Everyone</option><option value="student">Students</option><option value="staff">Staff</option></select></div>
+            <div class="field full"><label>Notice Details</label><textarea id="noticeBody" rows="4"></textarea></div>
+          </div>
+          <button class="btn" id="noticePublish">Publish Notice</button>
+          <div id="noticeAdminList"></div>
+        </div>
+
+        <div class="panel hidden" id="adminAchievements">
+          <h3>Add Student Achievement</h3>
+          <div class="fields">
+            <div class="field"><label>Student Name</label><input id="achievementStudent"></div>
+            <div class="field"><label>Achievement Title</label><input id="achievementTitle"></div>
+            <div class="field"><label>Date</label><input id="achievementDate" type="date"></div>
+            <div class="field full"><label>Description</label><textarea id="achievementDescription" rows="3"></textarea></div>
+          </div>
+          <button class="btn" id="achievementSave">Save Achievement</button>
+          <div id="achievementAdminList"></div>
         </div>
       </div>
 
@@ -495,10 +543,19 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
 
           <div id="roster"></div>
 
-          <button class="btn" id="saveRoster">
-            Save Student Attendance
-          </button>
+          <button class="btn" id="saveRoster">Save Student Attendance</button>
         </div>
+        <div class="panel">
+          <h3>Request Leave</h3>
+          <div class="fields">
+            <div class="field"><label>From Date</label><input id="staffLeaveStart" type="date"></div>
+            <div class="field"><label>To Date</label><input id="staffLeaveEnd" type="date"></div>
+            <div class="field full"><label>Reason</label><textarea id="staffLeaveReason" rows="3"></textarea></div>
+          </div>
+          <button class="btn" id="staffLeaveSubmit">Submit Leave Request</button>
+          <div id="staffLeaveHistory"></div>
+        </div>
+        <div class="panel"><h3>Academy Notices</h3><div id="staffNotices"></div></div>
       </div>
 
       <!-- STUDENT DASHBOARD -->
@@ -509,11 +566,19 @@ footer{background:#102541;margin-top:20px;padding:27px 0}
           <div class="grid" id="studentSummary"></div>
         </div>
 
+        <div class="panel"><h3>My Attendance History</h3><div id="myAttendance"></div></div>
         <div class="panel">
-          <h3>My Attendance History</h3>
-          <div id="myAttendance"></div>
+          <h3>Request Leave</h3>
+          <div class="fields">
+            <div class="field"><label>From Date</label><input id="studentLeaveStart" type="date"></div>
+            <div class="field"><label>To Date</label><input id="studentLeaveEnd" type="date"></div>
+            <div class="field full"><label>Reason</label><textarea id="studentLeaveReason" rows="3"></textarea></div>
+          </div>
+          <button class="btn" id="studentLeaveSubmit">Submit Leave Request</button>
+          <div id="studentLeaveHistory"></div>
         </div>
-
+        <div class="panel"><h3>Academy Notices</h3><div id="studentNotices"></div></div>
+        <div class="panel"><h3>My Achievements</h3><div id="studentAchievements"></div></div>
       </div>
 
     </div>
@@ -562,7 +627,7 @@ $('adBoard').addEventListener('change', updateAdmissionSection);
 
 
 
-['adDate', 'staffDate', 'classDate'].forEach(id => {
+['adDate', 'staffDate', 'classDate', 'achievementDate', 'staffLeaveStart', 'staffLeaveEnd', 'studentLeaveStart', 'studentLeaveEnd'].forEach(id => {
   $(id).value = today;
 });
 
@@ -680,9 +745,11 @@ async function loadDashboard() {
   } else if (data.role === 'staff') {
     $('staffDash').classList.remove('hidden');
     await loadStaff();
+    await loadRoleNotices('staff');
   } else if (data.role === 'student') {
     $('studentDash').classList.remove('hidden');
     await loadStudent();
+    await loadRoleNotices('student');
   } else {
     msg('dashMsg', 'Unknown account role.', true);
   }
@@ -758,6 +825,8 @@ async function loadAdmin() {
     );
   }
 
+  await loadAdminExtras();
+
   const { data: assignments, error: assignmentError } = await db
     .from('staff_class_assignments')
     .select('staff_id,class_name');
@@ -787,7 +856,7 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
@@ -1029,12 +1098,86 @@ async function loadStudent() {
     '</span><b>' + esc(x[1]) + '</b></div>'
   ).join('');
 
-  showTable(
-    'myAttendance',
-    ['Date', 'Status'],
-    all.map(x => [x.attendance_date, x.status])
-  );
+  showTable('myAttendance',['Date','Status'],all.map(x => [x.attendance_date,x.status]));
+  await loadStudentExtras(student);
 }
+
+/* PORTAL EXTRAS: leave, notices and achievements */
+function renderLeaveRows(target, rows, adminMode=false) {
+  if (!rows || !rows.length) { $(target).innerHTML='<p class="muted">No leave requests yet.</p>'; return; }
+  $(target).innerHTML = '<div class="tableWrap"><table><thead><tr><th>Applicant</th><th>Dates</th><th>Reason</th><th>Status</th>'+(adminMode?'<th>Action</th>':'')+'</tr></thead><tbody>'+
+    rows.map(r=>'<tr><td>'+esc(r.requester_role==='staff'?'Staff':(r.student_name||'Student'))+'</td><td>'+esc(r.start_date)+' to '+esc(r.end_date)+'</td><td>'+esc(r.reason)+'</td><td><b>'+esc(r.status)+'</b>'+(r.admin_note?'<br><small>'+esc(r.admin_note)+'</small>':'')+'</td>'+
+    (adminMode?'<td>'+(r.status==='Pending'?'<button class="btn" data-review="'+esc(r.id)+'" data-status="Approved">Approve</button> <button class="btn secondary" data-review="'+esc(r.id)+'" data-status="Rejected">Reject</button>':'—')+'</td>':'')+'</tr>').join('')+'</tbody></table></div>';
+  if(adminMode) $(target).querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewLeave(b.dataset.review,b.dataset.status));
+}
+async function loadAdminExtras() {
+  const {data: leaves,error:le}=await db.from('leave_requests').select('*').order('created_at',{ascending:false});
+  if(le) msg('dashMsg','Leave requests: '+le.message,true);
+  const {data: students}=await db.from('students').select('id,full_name,auth_user_id');
+  const studentMap=Object.fromEntries((students||[]).map(s=>[s.id,s.full_name]));
+  renderLeaveRows('adminLeaveList',(leaves||[]).map(r=>({...r,student_name:studentMap[r.student_id]})),true);
+
+  const {data:notices,error:ne}=await db.from('academy_notices').select('*').order('created_at',{ascending:false});
+  if(ne) msg('dashMsg','Notices: '+ne.message,true);
+  $('noticeAdminList').innerHTML=(notices||[]).map(n=>'<div class="panel"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(n.audience)+' · '+esc(n.created_at)+'</small></div>').join('')||'<p class="muted">No notices published.</p>';
+
+  const {data:achievements,error:ae}=await db.from('student_achievements').select('*').order('achievement_date',{ascending:false});
+  if(ae) msg('dashMsg','Achievements: '+ae.message,true);
+  $('achievementAdminList').innerHTML=(achievements||[]).map(a=>'<div class="panel"><b>'+esc(a.student_name)+' — '+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements added.</p>';
+}
+async function reviewLeave(id,status) {
+  const note=prompt('Optional note for this decision:')||null;
+  const {error}=await db.from('leave_requests').update({status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',id);
+  if(error) return msg('dashMsg',error.message,true);
+  msg('dashMsg','Leave request '+status.toLowerCase()+'.');
+  await loadAdminExtras();
+}
+async function submitLeave(role,studentId,startId,endId,reasonId,historyId) {
+  const start=$(startId).value,end=$(endId).value,reason=$(reasonId).value.trim();
+  if(!start||!end||!reason||end<start) return msg('dashMsg','Enter valid leave dates and reason.',true);
+  const {error}=await db.from('leave_requests').insert({requester_user_id:user.id,requester_role:role,student_id:studentId||null,start_date:start,end_date:end,reason});
+  if(error) return msg('dashMsg',error.message,true);
+  $(reasonId).value='';
+  msg('dashMsg','Leave request submitted successfully.');
+  await loadOwnLeave(role,historyId);
+}
+async function loadOwnLeave(role,target) {
+  const {data,error}=await db.from('leave_requests').select('*').eq('requester_user_id',user.id).order('created_at',{ascending:false});
+  if(error) return msg('dashMsg',error.message,true);
+  renderLeaveRows(target,data||[]);
+}
+async function loadRoleNotices(role) {
+  const target=role==='staff'?'staffNotices':'studentNotices';
+  const {data,error}=await db.from('academy_notices').select('title,body,audience,created_at').eq('published',true).in('audience',['all',role]).order('created_at',{ascending:false});
+  if(error) return msg('dashMsg',error.message,true);
+  $(target).innerHTML=(data||[]).map(n=>'<div class="panel"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(n.created_at)+'</small></div>').join('')||'<p class="muted">No new notices.</p>';
+}
+async function loadStudentExtras(student) {
+  $('studentLeaveSubmit').onclick=()=>submitLeave('student',student.id,'studentLeaveStart','studentLeaveEnd','studentLeaveReason','studentLeaveHistory');
+  await loadOwnLeave('student','studentLeaveHistory');
+  const {data,error}=await db.from('student_achievements').select('student_name,title,description,achievement_date').eq('published',true).eq('student_id',student.id).order('achievement_date',{ascending:false});
+  if(error) return msg('dashMsg',error.message,true);
+  $('studentAchievements').innerHTML=(data||[]).map(a=>'<div class="panel"><b>'+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements posted yet.</p>';
+}
+$('staffLeaveSubmit').onclick=()=>submitLeave('staff',null,'staffLeaveStart','staffLeaveEnd','staffLeaveReason','staffLeaveHistory');
+$('noticePublish').onclick=async()=>{
+  const title=$('noticeTitle').value.trim(),body=$('noticeBody').value.trim();
+  if(!title||!body) return msg('dashMsg','Enter a notice title and details.',true);
+  const {error}=await db.from('academy_notices').insert({title,body,audience:$('noticeAudience').value,created_by:user.id});
+  if(error) return msg('dashMsg',error.message,true);
+  $('noticeTitle').value='';$('noticeBody').value='';
+  msg('dashMsg','Notice published.');
+  await loadAdminExtras();
+};
+$('achievementSave').onclick=async()=>{
+  const studentName=$('achievementStudent').value.trim(),title=$('achievementTitle').value.trim();
+  if(!studentName||!title) return msg('dashMsg','Enter student name and achievement title.',true);
+  const {error}=await db.from('student_achievements').insert({student_name:studentName,title,description:$('achievementDescription').value.trim()||null,achievement_date:$('achievementDate').value||today,created_by:user.id});
+  if(error) return msg('dashMsg',error.message,true);
+  $('achievementStudent').value='';$('achievementTitle').value='';$('achievementDescription').value='';
+  msg('dashMsg','Achievement saved.');
+  await loadAdminExtras();
+};
 
 /* RESTORE EXISTING LOGIN SESSION */
 db.auth.getSession().then(({ data, error }) => {
