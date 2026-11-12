@@ -472,9 +472,7 @@ function localDate() {
 
 const today = localDate();
 
-document.addEventListener('DOMContentLoaded', () => {
-  $('year').textContent = new Date().getFullYear();
-});
+
 
 ['adDate', 'staffDate', 'classDate'].forEach(id => {
   $(id).value = today;
@@ -960,7 +958,7 @@ db.auth.getSession().then(({ data, error }) => {
 <footer>
   <div class="wrap row">
     <b>FIRST STEP ACADEMY · Learn. Practise. Grow.</b>
-    <span>© <span id="year"></span> First Step Academy</span>
+    <span>© 2026 First Step Academy</span>
   </div>
 </footer>
 
