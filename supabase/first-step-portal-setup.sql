@@ -131,11 +131,37 @@ alter table public.academy_notices enable row level security;
 alter table public.student_achievements enable row level security;
 alter table public.portal_notifications enable row level security;
 
+-- Keep SECURITY DEFINER authorization helpers outside the exposed public API schema.
+create schema if not exists private;
+revoke all on schema private from public,anon;
+grant usage on schema private to authenticated;
+
+create or replace function private.is_academy_admin()
+returns boolean language sql stable security definer
+set search_path=pg_catalog
+as $
+  select exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin');
+$;
+
+create or replace function private.is_assigned_to(target_class text)
+returns boolean language sql stable security definer
+set search_path=pg_catalog
+as $
+  select exists(select 1 from public.staff_class_assignments a where a.staff_id=auth.uid() and a.class_name=target_class);
+$;
+
+revoke all on function private.is_academy_admin() from public,anon;
+revoke all on function private.is_assigned_to(text) from public,anon;
+grant execute on function private.is_academy_admin() to authenticated;
+grant execute on function private.is_assigned_to(text) to authenticated;
+revoke all on function public.is_academy_admin() from public,anon,authenticated;
+revoke all on function public.is_assigned_to(text) from public,anon,authenticated;
+
 -- Leave requests: requester reads own, admin reviews; only linked students/staff can submit.
 drop policy if exists leave_select_own_or_admin on public.leave_requests;
 create policy leave_select_own_or_admin on public.leave_requests
 for select to authenticated
-using (requester_user_id = (select auth.uid()) or public.is_academy_admin());
+using (requester_user_id = (select auth.uid()) or private.is_academy_admin());
 
 drop policy if exists leave_insert_own on public.leave_requests;
 create policy leave_insert_own on public.leave_requests
@@ -154,50 +180,50 @@ with check (
 
 drop policy if exists leave_admin_review on public.leave_requests;
 create policy leave_admin_review on public.leave_requests
-for update to authenticated using (public.is_academy_admin())
-with check (public.is_academy_admin());
+for update to authenticated using (private.is_academy_admin())
+with check (private.is_academy_admin());
 
 -- Notices: published audience-specific reading, admin-only management.
 drop policy if exists notices_read_for_audience on public.academy_notices;
 create policy notices_read_for_audience on public.academy_notices
 for select to authenticated
 using (
-  public.is_academy_admin()
+  private.is_academy_admin()
   or (published=true and (audience='all' or exists (
     select 1 from public.profiles p where p.id=(select auth.uid()) and p.role=audience
   )))
 );
 drop policy if exists notices_admin_insert on public.academy_notices;
 create policy notices_admin_insert on public.academy_notices
-for insert to authenticated with check (public.is_academy_admin() and created_by=(select auth.uid()));
+for insert to authenticated with check (private.is_academy_admin() and created_by=(select auth.uid()));
 drop policy if exists notices_admin_update on public.academy_notices;
 create policy notices_admin_update on public.academy_notices
-for update to authenticated using (public.is_academy_admin()) with check (public.is_academy_admin());
+for update to authenticated using (private.is_academy_admin()) with check (private.is_academy_admin());
 drop policy if exists notices_admin_delete on public.academy_notices;
 create policy notices_admin_delete on public.academy_notices
-for delete to authenticated using (public.is_academy_admin());
+for delete to authenticated using (private.is_academy_admin());
 
 -- Achievements: authenticated users see published entries; public page gets only non-identifying columns.
 drop policy if exists achievements_read_published on public.student_achievements;
 create policy achievements_read_published on public.student_achievements
-for select to authenticated using (published=true or public.is_academy_admin());
+for select to authenticated using (published=true or private.is_academy_admin());
 drop policy if exists achievements_public_read_published on public.student_achievements;
 create policy achievements_public_read_published on public.student_achievements
 for select to anon using (published=true);
 drop policy if exists achievements_admin_insert on public.student_achievements;
 create policy achievements_admin_insert on public.student_achievements
-for insert to authenticated with check (public.is_academy_admin() and created_by=(select auth.uid()));
+for insert to authenticated with check (private.is_academy_admin() and created_by=(select auth.uid()));
 drop policy if exists achievements_admin_update on public.student_achievements;
 create policy achievements_admin_update on public.student_achievements
-for update to authenticated using (public.is_academy_admin()) with check (public.is_academy_admin());
+for update to authenticated using (private.is_academy_admin()) with check (private.is_academy_admin());
 drop policy if exists achievements_admin_delete on public.student_achievements;
 create policy achievements_admin_delete on public.student_achievements
-for delete to authenticated using (public.is_academy_admin());
+for delete to authenticated using (private.is_academy_admin());
 
 -- Notifications are created only by the database trigger; users may only mark their own as read.
 drop policy if exists notifications_read_own_or_admin on public.portal_notifications;
 create policy notifications_read_own_or_admin on public.portal_notifications
-for select to authenticated using (recipient_user_id=(select auth.uid()) or public.is_academy_admin());
+for select to authenticated using (recipient_user_id=(select auth.uid()) or private.is_academy_admin());
 drop policy if exists notifications_update_own_read_status on public.portal_notifications;
 create policy notifications_update_own_read_status on public.portal_notifications
 for update to authenticated using (recipient_user_id=(select auth.uid()))
@@ -232,14 +258,12 @@ drop trigger if exists leave_decision_notification on public.leave_requests;
 create trigger leave_decision_notification after update of status on public.leave_requests
 for each row execute function public.notify_leave_decision();
 
-revoke execute on function public.is_academy_admin() from anon;
-revoke execute on function public.is_assigned_to(text) from anon;
 
 -- Section-aware roster access and attendance submission.
 drop policy if exists "admin or assigned staff read roster" on public.student_roster;
 create policy "admin or assigned staff read roster" on public.student_roster
 for select to authenticated
-using (public.is_academy_admin() or (active=true and section_name is not null and public.is_assigned_to('Section '||section_name)));
+using (private.is_academy_admin() or (active=true and section_name is not null and private.is_assigned_to('Section '||section_name)));
 
 drop policy if exists "staff mark assigned class attendance" on public.attendance;
 create policy "staff mark assigned class attendance" on public.attendance
@@ -250,7 +274,7 @@ with check (
     select 1 from public.student_roster r
     where r.student_id=attendance.student_id and r.class_name=attendance.class_name
       and r.active=true and r.section_name is not null
-      and public.is_assigned_to('Section '||r.section_name)
+      and private.is_assigned_to('Section '||r.section_name)
   )
 );
 
