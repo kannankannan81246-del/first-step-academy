@@ -17,7 +17,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $fn$
 begin
   if tg_op = 'DELETE' then
     delete from public.student_roster where student_id = old.id;
@@ -35,7 +35,7 @@ begin
         section_name = excluded.section_name;
   return new;
 end;
-$$;
+$fn$;
 revoke all on function public.sync_student_roster() from public, anon, authenticated;
 drop trigger if exists students_roster_sync on public.students;
 create trigger students_roster_sync
@@ -141,16 +141,16 @@ grant usage on schema private to authenticated;
 create or replace function private.is_academy_admin()
 returns boolean language sql stable security definer
 set search_path=pg_catalog
-as $
+as $fn$
   select exists(select 1 from public.profiles p where p.id=auth.uid() and p.role='admin');
-$;
+$fn$;
 
 create or replace function private.is_assigned_to(target_class text)
 returns boolean language sql stable security definer
 set search_path=pg_catalog
-as $
+as $fn$
   select exists(select 1 from public.staff_class_assignments a where a.staff_id=auth.uid() and a.class_name=target_class);
-$;
+$fn$;
 
 revoke all on function private.is_academy_admin() from public,anon;
 revoke all on function private.is_assigned_to(text) from public,anon;
@@ -290,7 +290,7 @@ grant select (id,title,description,achievement_date) on public.student_achieveme
 
 create or replace function public.notify_leave_decision()
 returns trigger language plpgsql security definer set search_path=public
-as $$
+as $fn$
 declare decision_text text; details text;
 begin
   if old.status='Pending' and new.status in ('Approved','Rejected') then
@@ -302,7 +302,7 @@ begin
   end if;
   return new;
 end;
-$$;
+$fn$;
 revoke all on function public.notify_leave_decision() from public,anon,authenticated;
 drop trigger if exists leave_decision_notification on public.leave_requests;
 create trigger leave_decision_notification after update of status on public.leave_requests
