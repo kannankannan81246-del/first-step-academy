@@ -572,6 +572,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="staffLeaveSubmit">Submit Leave Request</button>
           <div id="staffLeaveHistory"></div>
         </div>
+        <div class="panel"><h3>My Notifications</h3><div id="staffNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="staffNotices"></div></div>
       </div>
 
@@ -598,6 +599,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="studentLeaveSubmit">Submit Leave Request</button>
           <div id="studentLeaveHistory"></div>
         </div>
+        <div class="panel"><h3>My Notifications</h3><div id="studentNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="studentNotices"></div></div>
         <div class="panel"><h3>My Achievements</h3><div id="studentAchievements"></div></div>
       </div>
@@ -767,10 +769,12 @@ async function loadDashboard() {
     $('staffDash').classList.remove('hidden');
     await loadStaff();
     await loadRoleNotices('staff');
+    await loadNotifications();
   } else if (data.role === 'student') {
     $('studentDash').classList.remove('hidden');
     await loadStudent();
     await loadRoleNotices('student');
+    await loadNotifications();
   } else {
     msg('dashMsg', 'Unknown account role.', true);
   }
@@ -1156,9 +1160,29 @@ async function loadAdminExtras() {
 }
 async function reviewLeave(id,status) {
   const note=prompt('Optional note for this decision:')||null;
-  const {error}=await db.from('leave_requests').update({status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()}).eq('id',id);
+  const {data:request,error:requestError}=await db.from('leave_requests')
+    .select('requester_user_id,requester_role,start_date,end_date')
+    .eq('id',id).single();
+  if(requestError) return msg('dashMsg','Could not load leave request: '+requestError.message,true);
+  const {error}=await db.from('leave_requests').update({
+    status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()
+  }).eq('id',id);
   if(error) return msg('dashMsg',error.message,true);
-  msg('dashMsg','Leave request '+status.toLowerCase()+'.');
+
+  const decisionText = status === 'Approved' ? 'approved' : 'not approved';
+  const details = 'Your leave request ('+request.start_date+' to '+request.end_date+') has been '+decisionText+'.'
+    +(note ? ' Admin note: '+note : '');
+  const {error:notifyError}=await db.from('portal_notifications').insert({
+    recipient_user_id:request.requester_user_id,
+    title:'Leave request '+status,
+    message:details,
+    related_leave_id:id
+  });
+  if(notifyError) {
+    msg('dashMsg','Leave decision saved, but notification could not be created: '+notifyError.message,true);
+  } else {
+    msg('dashMsg','Leave request '+status.toLowerCase()+'. Notification sent to the user portal.');
+  }
   await loadAdminExtras();
 }
 async function submitLeave(role,studentId,startId,endId,reasonId,historyId) {
@@ -1175,6 +1199,34 @@ async function loadOwnLeave(role,target) {
   if(error) return msg('dashMsg',error.message,true);
   renderLeaveRows(target,data||[]);
 }
+async function loadNotifications() {
+  const target = profile.role === 'staff' ? 'staffNotifications' : 'studentNotifications';
+  const {data,error}=await db.from('portal_notifications')
+    .select('id,title,message,is_read,created_at')
+    .eq('recipient_user_id',user.id)
+    .order('created_at',{ascending:false});
+  if(error) {
+    $(target).innerHTML='<p class="muted">Notifications are not available yet. The admin may need to complete the database setup.</p>';
+    return;
+  }
+  const rows=data||[];
+  $(target).innerHTML=rows.length ? rows.map(n =>
+    '<div class="panel" style="margin:10px 0;border-left:4px solid '+(n.is_read?'#dce5ed':'#b58a3a')+'">'+
+    '<div class="row"><b>'+esc(n.title)+'</b><small>'+esc(n.created_at)+'</small></div>'+
+    '<p>'+esc(n.message)+'</p>'+
+    (n.is_read?'<small class="muted">Read</small>':'<button class="btn secondary" data-read-notification="'+esc(n.id)+'">Mark as read</button>')+
+    '</div>'
+  ).join('') : '<p class="muted">You have no notifications yet.</p>';
+  $(target).querySelectorAll('[data-read-notification]').forEach(button=>{
+    button.onclick=async()=>{
+      const {error:readError}=await db.from('portal_notifications')
+        .update({is_read:true}).eq('id',button.dataset.readNotification);
+      if(readError) return msg('dashMsg',readError.message,true);
+      await loadNotifications();
+    };
+  });
+}
+
 async function loadRoleNotices(role) {
   const target=role==='staff'?'staffNotices':'studentNotices';
   const {data,error}=await db.from('academy_notices').select('title,body,audience,created_at').eq('published',true).in('audience',['all',role]).order('created_at',{ascending:false});
