@@ -472,7 +472,9 @@ function localDate() {
 
 const today = localDate();
 
-$('year').textContent = new Date().getFullYear();
+document.addEventListener('DOMContentLoaded', () => {
+  $('year').textContent = new Date().getFullYear();
+});
 
 ['adDate', 'staffDate', 'classDate'].forEach(id => {
   $(id).value = today;
