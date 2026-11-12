@@ -154,6 +154,54 @@ revoke all on function private.is_academy_admin() from public,anon;
 revoke all on function private.is_assigned_to(text) from public,anon;
 grant execute on function private.is_academy_admin() to authenticated;
 grant execute on function private.is_assigned_to(text) to authenticated;
+
+-- Migrate existing base-schema policies to the private authorization helpers.
+drop policy if exists "admin manage student attendance" on public.attendance;
+create policy "admin manage student attendance" on public.attendance
+for all to authenticated using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists "student read own attendance" on public.attendance;
+create policy "student read own attendance" on public.attendance
+for select to authenticated
+using (exists (
+  select 1 from public.students s
+  where s.id=attendance.student_id and s.auth_user_id=(select auth.uid())
+));
+
+drop policy if exists "admin manage profiles" on public.profiles;
+create policy "admin manage profiles" on public.profiles
+for all to authenticated using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists "profiles self or admin read" on public.profiles;
+create policy "profiles self or admin read" on public.profiles
+for select to authenticated
+using (id=(select auth.uid()) or private.is_academy_admin());
+
+drop policy if exists "admin manage staff attendance" on public.staff_attendance;
+create policy "admin manage staff attendance" on public.staff_attendance
+for all to authenticated using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists "admin manage class assignments" on public.staff_class_assignments;
+create policy "admin manage class assignments" on public.staff_class_assignments
+for all to authenticated using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists "staff read own assignments" on public.staff_class_assignments;
+create policy "staff read own assignments" on public.staff_class_assignments
+for select to authenticated using (staff_id=(select auth.uid()));
+
+drop policy if exists "admin manage students" on public.students;
+create policy "admin manage students" on public.students
+for all to authenticated using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists "student reads own student record" on public.students;
+create policy "student reads own student record" on public.students
+for select to authenticated using (auth_user_id=(select auth.uid()));
+
 revoke all on function public.is_academy_admin() from public,anon,authenticated;
 revoke all on function public.is_assigned_to(text) from public,anon,authenticated;
 
