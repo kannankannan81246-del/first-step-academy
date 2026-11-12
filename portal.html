@@ -965,7 +965,7 @@ $('studentSectionSave').onclick = async () => {
   const option = $('studentSectionStudent').selectedOptions[0];
   const className = option ? option.dataset.class : '';
   const section = sectionFor(className, board);
-  const needsBoard = Number(String(className).replace(/\\D/g,'')) >= 8;
+  const needsBoard = Number(String(className).replace(/\D/g,'')) >= 8;
   if (!studentId || (needsBoard && !board) || !section) {
     return msg('dashMsg', 'Select a student and choose the correct board for Classes 8–10.', true);
   }
