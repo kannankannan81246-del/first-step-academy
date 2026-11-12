@@ -964,10 +964,13 @@ $('adSave').onclick = async () => {
     );
   }
 
-  const subjects = $('adSubjects').value
+  const subjects = [...new Set($('adSubjects').value
     .split(',')
     .map(x => x.trim())
-    .filter(Boolean);
+    .filter(Boolean))];
+  if (grade >= 9 && grade <= 12 && subjects.length === 0) {
+    return msg('dashMsg', 'Enter at least one subject for Classes 9–12.', true);
+  }
 
   const row = {
     full_name: name,
@@ -1136,7 +1139,7 @@ async function loadStaff() {
 
   $('classSelect').innerHTML =
     sections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
-    (assignedSubjects.length ? '<option value="SENIOR">Classes 11–12 · Subject-wise</option>' : '');
+    (assignedSubjects.length ? '<option value="SENIOR">My Subject Students</option>' : '');
 
   const subjectSet = new Set(assignedSubjects);
   if(sections.length) {
