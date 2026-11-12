@@ -575,7 +575,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
               <input id="classDate" type="date">
             </div>
             <div class="field">
-              <label>Subject (Classes 9–12)</label>
+              <label>Subject (Required for Classes 9–12)</label>
               <select id="attendanceSubject"><option value="">No Subject (Classes 1–8)</option></select>
             </div>
           </div>
@@ -1141,25 +1141,47 @@ async function loadStaff() {
     sections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
     (assignedSubjects.length ? '<option value="SENIOR">My Subject Students</option>' : '');
 
-  const subjectSet = new Set(assignedSubjects);
+  const sectionSubjects = new Set();
   if(sections.length) {
     const {data: sectionStudents, error: rosterError} = await db.from('student_roster')
       .select('class_name,subjects').in('section_name',sections).eq('active',true);
     if(rosterError) return msg('dashMsg',rosterError.message,true);
     (sectionStudents||[]).filter(s=>['Class 9','Class 10'].includes(s.class_name))
-      .forEach(s=>(s.subjects||[]).forEach(subject=>subjectSet.add(subject)));
+      .forEach(s=>(s.subjects||[]).forEach(subject=>sectionSubjects.add(subject)));
   }
-  $('attendanceSubject').innerHTML = '<option value="">No Subject (Classes 1–8)</option>' +
-    [...subjectSet].sort((a,b)=>a.localeCompare(b)).map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');
-  $('attendanceSubject').value = '';
+
+  const subjectSelect = $('attendanceSubject');
+  const subjectField = subjectSelect.closest('.field');
+  const subjectLabel = subjectField.querySelector('label');
+  const renderSubjectOptions = () => {
+    const group = $('classSelect').value;
+    let choices = [];
+    if(group==='SENIOR') {
+      choices = assignedSubjects;
+      subjectLabel.textContent = 'Subject (Assigned Classes 11–12)';
+      subjectSelect.disabled = false;
+      subjectSelect.required = true;
+    } else if(group==='C' || group==='D') {
+      choices = [...sectionSubjects];
+      subjectLabel.textContent = 'Subject (Classes 9–10; no subject for Class 8)';
+      subjectSelect.disabled = false;
+      subjectSelect.required = false;
+    } else {
+      subjectLabel.textContent = 'Subject (Not required for Classes 1–8)';
+      subjectSelect.disabled = true;
+      subjectSelect.required = false;
+    }
+    subjectSelect.innerHTML = '<option value="">No Subject (Classes 1–8)</option>' +
+      choices.sort((a,b)=>a.localeCompare(b)).map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+    subjectSelect.value = '';
+  };
+  renderSubjectOptions();
   $('classSelect').onchange = () => {
     $('roster').replaceChildren();
     rosterRows = [];
-    if($('classSelect').value==='SENIOR' && !$('attendanceSubject').value) {
-      $('attendanceSubject').value = assignedSubjects[0] || '';
-    }
+    renderSubjectOptions();
   };
-  $('attendanceSubject').onchange = () => {
+  subjectSelect.onchange = () => {
     $('roster').replaceChildren();
     rosterRows = [];
   };
