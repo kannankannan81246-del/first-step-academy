@@ -516,6 +516,16 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 
           <button class="btn" id="assignSave">Assign Section</button>
           <div id="assignRecords"></div>
+          <div class="panel" style="margin-top:18px">
+            <h3>Assign Subjects to Staff (Classes 11–12)</h3>
+            <p class="muted">A staff member can handle multiple subjects. They will only see senior students who study their assigned subjects.</p>
+            <div class="fields">
+              <div class="field"><label>Select Staff</label><select id="subjectAssignStaff"></select></div>
+              <div class="field"><label>Subject</label><input id="subjectAssignName" placeholder="e.g. Physics, Biology, Social Science"></div>
+            </div>
+            <button class="btn" id="subjectAssignSave">Assign Subject</button>
+            <div id="subjectAssignRecords"></div>
+          </div>
         </div>
 
         <div class="panel hidden" id="adminLeaves">
@@ -563,6 +573,10 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             <div class="field">
               <label>Attendance Date</label>
               <input id="classDate" type="date">
+            </div>
+            <div class="field">
+              <label>Subject (Classes 9–12)</label>
+              <select id="attendanceSubject"><option value="">No Subject (Classes 1–8)</option></select>
             </div>
           </div>
 
@@ -814,6 +828,9 @@ async function loadAdmin() {
       '</option>'
     ).join('');
   });
+  $('subjectAssignStaff').innerHTML = staffList.map(s =>
+    '<option value="' + esc(s.id) + '">' + esc(s.full_name) + ' (' + esc(s.login_id) + ')</option>'
+  ).join('');
 
   const { data: students, error } = await db
     .from('students')
@@ -888,6 +905,28 @@ async function loadAdmin() {
         /^Section [A-D]$/.test(a.class_name || '') ? a.class_name : 'Needs section mapping (' + (a.class_name || 'Unassigned') + ')'
       ])
     );
+  }
+
+  const {data: subjectAssignments, error: subjectAssignmentError} = await db
+    .from('staff_subject_assignments').select('staff_id,subject_name').order('subject_name');
+  if(subjectAssignmentError) {
+    msg('dashMsg', 'Subject assignments: ' + subjectAssignmentError.message, true);
+  } else {
+    $('subjectAssignRecords').innerHTML = subjectAssignments.length
+      ? '<div class="tableWrap"><table><thead><tr><th>Staff</th><th>Subject</th><th>Action</th></tr></thead><tbody>' +
+        subjectAssignments.map(a => '<tr><td>' + esc(staffMap[a.staff_id] || a.staff_id) + '</td><td>' + esc(a.subject_name) +
+          '</td><td><button class="btn secondary" data-remove-subject="' + esc(a.staff_id) + '" data-subject="' + esc(a.subject_name) + '">Remove</button></td></tr>').join('') +
+        '</tbody></table></div>'
+      : '<p class="muted">No senior subject assignments yet.</p>';
+    $('subjectAssignRecords').querySelectorAll('[data-remove-subject]').forEach(button => {
+      button.onclick = async () => {
+        const {error:removeError} = await db.from('staff_subject_assignments')
+          .delete().eq('staff_id', button.dataset.removeSubject).eq('subject_name', button.dataset.subject);
+        if(removeError) return msg('dashMsg', removeError.message, true);
+        msg('dashMsg', 'Subject assignment removed.');
+        await loadAdmin();
+      };
+    });
   }
 }
 
@@ -1058,94 +1097,122 @@ $('assignSave').onclick = async () => {
   }
 };
 
+$('subjectAssignSave').onclick = async () => {
+  const staffId = $('subjectAssignStaff').value;
+  const subject = $('subjectAssignName').value.trim().replace(/\\s+/g, ' ');
+  if(!staffId || !subject) return msg('dashMsg', 'Select a staff member and enter a subject.', true);
+  const {error} = await db.from('staff_subject_assignments').upsert(
+    {staff_id:staffId,subject_name:subject},{onConflict:'staff_id,subject_name',ignoreDuplicates:true}
+  );
+  if(error) return msg('dashMsg', error.message, true);
+  $('subjectAssignName').value = '';
+  msg('dashMsg', 'Subject assigned successfully.');
+  await loadAdmin();
+};
+
 /* STAFF DASHBOARD */
 async function loadStaff() {
-  const { data, error } = await db
-    .from('staff_class_assignments')
-    .select('class_name')
-    .eq('staff_id', user.id);
+  const {data: sectionRows, error: sectionError} = await db
+    .from('staff_class_assignments').select('class_name').eq('staff_id',user.id);
+  if(sectionError) return msg('dashMsg', sectionError.message, true);
 
-  if (error) {
-    return msg('dashMsg', error.message, true);
+  const {data: subjectRows, error: subjectError} = await db
+    .from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id);
+  if(subjectError) return msg('dashMsg', subjectError.message, true);
+
+  const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
+  const assignedSubjects = [...new Set((subjectRows||[]).map(x=>x.subject_name).filter(Boolean))];
+
+  $('myClasses').textContent = [
+    sections.length ? sections.map(x=>'Section '+x).join(' · ') : '',
+    assignedSubjects.length ? 'Senior subjects: '+assignedSubjects.join(', ') : ''
+  ].filter(Boolean).join(' | ') || 'No sections or senior subjects assigned yet. Please contact the admin.';
+
+  $('classSelect').innerHTML =
+    sections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
+    (assignedSubjects.length ? '<option value="SENIOR">Classes 11–12 · Subject-wise</option>' : '');
+
+  const subjectSet = new Set(assignedSubjects);
+  if(sections.length) {
+    const {data: sectionStudents, error: rosterError} = await db.from('student_roster')
+      .select('class_name,subjects').in('section_name',sections).eq('active',true);
+    if(rosterError) return msg('dashMsg',rosterError.message,true);
+    (sectionStudents||[]).filter(s=>['Class 9','Class 10'].includes(s.class_name))
+      .forEach(s=>(s.subjects||[]).forEach(subject=>subjectSet.add(subject)));
   }
-
-  const sections = [...new Set((data || []).map(x => String(x.class_name || '').replace(/^Section\s+/i, '')).filter(x => /^[A-D]$/.test(x)))];
-
-  $('myClasses').textContent = sections.length
-    ? sections.map(x => 'Section ' + x).join(' · ')
-    : 'No sections assigned yet. Please contact the admin.';
-
-  $('classSelect').innerHTML = sections.map(x =>
-    '<option value="' + esc(x) + '">Section ' + esc(x) + '</option>'
-  ).join('');
+  $('attendanceSubject').innerHTML = '<option value="">No Subject (Classes 1–8)</option>' +
+    [...subjectSet].sort((a,b)=>a.localeCompare(b)).map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');
+  $('attendanceSubject').value = '';
+  $('classSelect').onchange = () => {
+    $('roster').replaceChildren();
+    rosterRows = [];
+    if($('classSelect').value==='SENIOR' && !$('attendanceSubject').value) {
+      $('attendanceSubject').value = assignedSubjects[0] || '';
+    }
+  };
+  $('attendanceSubject').onchange = () => {
+    $('roster').replaceChildren();
+    rosterRows = [];
+  };
   await loadOwnLeave('staff','staffLeaveHistory');
 }
 
 /* LOAD STUDENT ROSTER */
 $('loadRoster').onclick = async () => {
-  const section = $('classSelect').value;
+  const group = $('classSelect').value;
+  const subject = $('attendanceSubject').value;
+  if(!group) return msg('dashMsg','No assigned section or senior subject access available.',true);
+  if(group==='SENIOR' && !subject) return msg('dashMsg','Select your assigned subject first.',true);
 
-  if (!section) {
-    return msg('dashMsg', 'No assigned section available.', true);
-  }
+  let query = db.from('student_roster')
+    .select('student_id,full_name,class_name,section_name,subjects')
+    .eq('active',true).order('full_name');
+  if(group==='SENIOR') query = query.in('class_name',['Class 11','Class 12']);
+  else query = query.eq('section_name',group);
 
-  const { data, error } = await db
-    .from('student_roster')
-    .select('student_id,full_name,class_name,section_name')
-    .eq('section_name', section)
-    .eq('active', true)
-    .order('full_name');
+  const {data,error} = await query;
+  if(error) return msg('dashMsg',error.message,true);
 
-  if (error) {
-    return msg('dashMsg', error.message, true);
-  }
-
-  rosterRows = data || [];
+  const matches = (data||[]).filter(student => {
+    const grade = Number(String(student.class_name||'').replace(/\\D/g,''));
+    const hasSubject = (student.subjects||[]).some(x=>String(x).toLowerCase()===subject.toLowerCase());
+    if(grade>=1 && grade<=8) return group!=='SENIOR' && !subject;
+    if(grade>=9 && grade<=10) return group!=='SENIOR' && !!subject && hasSubject;
+    if(grade===11 || grade===12) return group==='SENIOR' && !!subject && hasSubject;
+    return false;
+  });
+  rosterRows = matches.map(student=>({...student,attendance_subject:Number(String(student.class_name).replace(/\\D/g,''))>=9?subject:''}));
 
   $('roster').innerHTML = rosterRows.length
     ? rosterRows.map(s =>
         '<div class="row" style="padding:9px;border-bottom:1px solid #e3ebf1">' +
-        '<span>' + esc(s.full_name) + '</span>' +
+        '<span><b>' + esc(s.full_name) + '</b><small class="muted"> · ' + esc(s.class_name) + (s.attendance_subject?' · '+esc(s.attendance_subject):'') + '</small></span>' +
         '<select data-student="' + esc(s.student_id) + '">' +
-        '<option>Present</option>' +
-        '<option>Absent</option>' +
-        '<option>Leave</option>' +
+        '<option>Present</option><option>Absent</option><option>Leave</option>' +
         '</select></div>'
       ).join('')
-    : 'No active students in this class.';
+    : '<p class="muted">No students found for this section and subject.</p>';
 };
 
 /* SAVE STUDENT ATTENDANCE */
 $('saveRoster').onclick = async () => {
-  if (!rosterRows.length) {
-    return msg('dashMsg', 'Load the class roster first.', true);
-  }
+  if(!rosterRows.length) return msg('dashMsg','Load the student list first.',true);
+  const date=$('classDate').value;
+  if(!date) return msg('dashMsg','Select an attendance date.',true);
 
-  const date = $('classDate').value;
-
-  if (!date) {
-    return msg('dashMsg', 'Select an attendance date.', true);
-  }
-
-  const rows = rosterRows.map(s => ({
-    student_id: s.student_id,
-    class_name: s.class_name,
-    attendance_date: date,
-    status: $('roster').querySelector(
-      '[data-student="' + s.student_id + '"]'
-    ).value,
-    marked_by: user.id
+  const rows=rosterRows.map(student=>({
+    student_id:student.student_id,
+    class_name:student.class_name,
+    attendance_date:date,
+    subject_name:student.attendance_subject || '',
+    status:$('roster').querySelector('[data-student="'+student.student_id+'"]').value,
+    marked_by:user.id
   }));
-
-  const { error } = await db.from('attendance').upsert(rows, {
-    onConflict: 'student_id,attendance_date'
+  const {error}=await db.from('attendance').upsert(rows,{
+    onConflict:'student_id,attendance_date,subject_name'
   });
-
-  if (error) {
-    msg('dashMsg', error.message, true);
-  } else {
-    msg('dashMsg', 'Student attendance saved successfully.');
-  }
+  if(error) return msg('dashMsg',error.message,true);
+  msg('dashMsg','Student attendance saved successfully.');
 };
 
 /* STUDENT DASHBOARD */
@@ -1172,7 +1239,7 @@ async function loadStudent() {
 
   const { data: rows, error: attendanceError } = await db
     .from('attendance')
-    .select('attendance_date,status')
+    .select('attendance_date,status,subject_name')
     .eq('student_id', student.id)
     .order('attendance_date', { ascending: false });
 
@@ -1198,7 +1265,7 @@ async function loadStudent() {
     '</span><b>' + esc(x[1]) + '</b></div>'
   ).join('');
 
-  showTable('myAttendance',['Date','Status'],all.map(x => [x.attendance_date,x.status]));
+  showTable('myAttendance',['Date','Subject','Status'],all.map(x => [x.attendance_date,x.subject_name||'—',x.status]));
   await loadStudentExtras(student);
 }
 
