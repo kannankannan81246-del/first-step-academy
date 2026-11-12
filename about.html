@@ -27,7 +27,22 @@ section{padding:45px 0}
 footer{background:#10233c;color:#d4deea;padding:24px 0;margin-top:35px}
 @media(max-width:720px){.nav{padding:12px 0;flex-wrap:wrap}.grid{grid-template-columns:1fr}}
 </style>
-</head>
+<style>
+:root{--navy:#102541;--gold:#b58a3a;--ink:#243247;--muted:#718096;--paper:#f5f6f8;--line:#e7e1d5}
+body{font-family:Inter,"Segoe UI",Arial,sans-serif;background:#fff;color:var(--ink);line-height:1.7}
+header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);box-shadow:0 5px 24px rgba(16,37,65,.06)}
+header h2{color:var(--navy)}
+nav a{color:var(--navy)!important;text-decoration:none;font-weight:700;padding:8px 11px;border-radius:9px;display:inline-block}
+nav a:hover{background:#f5f0e6;color:#8b672d!important}
+h1,h2,h3{color:var(--navy)}
+main{width:min(1100px,92%);margin:36px auto}
+.group,.card,.panel,.intro,.empty,.gallery-box{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 30px rgba(16,37,65,.055)}
+.hero{background:linear-gradient(125deg,#f7f8fa,#f6f1e7)}
+.tag{color:#9b742e}
+.btn{background:linear-gradient(135deg,#c7a45e,#9b742e);color:#fff;border:0;border-radius:11px;padding:12px 20px;font-weight:800}
+footer{background:#102541;color:#e4e9ef;padding:26px 0}
+@media(max-width:720px){header nav{display:flex;overflow-x:auto;white-space:nowrap;padding:4px 0 8px}header nav a{font-size:.82rem}main{margin:24px auto}.grid,.cards{grid-template-columns:1fr}}
+</style></head>
 <body>
 <header><div class="wrap nav">
 <a class="brand" href="index.html"><span class="logo">F</span>FIRST STEP ACADEMY</a>
