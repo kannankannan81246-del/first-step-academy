@@ -669,7 +669,8 @@ function sectionFor(className, board) {
 
 function updateAdmissionSection() {
   const section = sectionFor($('adClass').value, $('adBoard').value);
-  $('adSection').value = section ? 'Section ' + section : '';
+  const n = Number(String($('adClass').value || '').replace(/\D/g, ''));
+  $('adSection').value = section ? 'Section ' + section : (n === 11 || n === 12 ? 'Subject-based access' : '');
 }
 $('adClass').addEventListener('change', updateAdmissionSection);
 $('adBoard').addEventListener('change', updateAdmissionSection);
@@ -907,6 +908,7 @@ async function loadAdmin() {
     );
   }
 
+  const staffNameMap = Object.fromEntries(staffList.map(s => [s.id, s.full_name]));
   const {data: subjectAssignments, error: subjectAssignmentError} = await db
     .from('staff_subject_assignments').select('staff_id,subject_name').order('subject_name');
   if(subjectAssignmentError) {
@@ -914,7 +916,7 @@ async function loadAdmin() {
   } else {
     $('subjectAssignRecords').innerHTML = subjectAssignments.length
       ? '<div class="tableWrap"><table><thead><tr><th>Staff</th><th>Subject</th><th>Action</th></tr></thead><tbody>' +
-        subjectAssignments.map(a => '<tr><td>' + esc(staffMap[a.staff_id] || a.staff_id) + '</td><td>' + esc(a.subject_name) +
+        subjectAssignments.map(a => '<tr><td>' + esc(staffNameMap[a.staff_id] || a.staff_id) + '</td><td>' + esc(a.subject_name) +
           '</td><td><button class="btn secondary" data-remove-subject="' + esc(a.staff_id) + '" data-subject="' + esc(a.subject_name) + '">Remove</button></td></tr>').join('') +
         '</tbody></table></div>'
       : '<p class="muted">No senior subject assignments yet.</p>';
@@ -952,7 +954,9 @@ $('adSave').onclick = async () => {
   const board = $('adBoard').value;
   const section = sectionFor(cls, board);
 
-  if (!name || !code || !cls || !board || !section) {
+  const grade = Number(String(cls).replace(/\D/g, ''));
+  const seniorClass = grade === 11 || grade === 12;
+  if (!name || !code || !cls || !board || (!section && !seniorClass)) {
     return msg(
       'dashMsg',
       'Enter student name, code, class and a valid board/section combination.',
@@ -970,7 +974,7 @@ $('adSave').onclick = async () => {
     student_code: code,
     class_name: cls,
     board_name: board,
-    section_name: section,
+    section_name: section || null,
     date_of_birth: $('adDob').value || null,
     guardian_name: $('adGuardian').value.trim() || null,
     guardian_phone: $('adPhone').value.trim() || null,
@@ -1006,10 +1010,12 @@ $('studentSectionSave').onclick = async () => {
   const className = option ? option.dataset.class : '';
   const section = sectionFor(className, board);
   const needsBoard = Number(String(className).replace(/\D/g,'')) >= 8;
-  if (!studentId || (needsBoard && !board) || !section) {
+  const grade = Number(String(className).replace(/\D/g,''));
+  const seniorClass = grade === 11 || grade === 12;
+  if (!studentId || (needsBoard && !board) || (!section && !seniorClass)) {
     return msg('dashMsg', 'Select a student and choose the correct board for Classes 8–10.', true);
   }
-  const { error } = await db.from('students').update({board_name:board || null,section_name:section}).eq('id',studentId);
+  const { error } = await db.from('students').update({board_name:board || null,section_name:section || null}).eq('id',studentId);
   if (error) return msg('dashMsg', error.message, true);
   msg('dashMsg', 'Student board and section updated successfully.');
   $('studentSectionStudent').value = '';
