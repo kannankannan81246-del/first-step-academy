@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>About Us | First Step Academy</title>
+<style>
+:root{--navy:#142b4a;--teal:#20a596;--ink:#243247;--muted:#65758a;--paper:#f5f8fb;--line:#e3ebf1}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.7 Arial,sans-serif;color:var(--ink)}
+a{text-decoration:none;color:inherit}
+.wrap{width:min(1100px,92%);margin:auto}
+header{border-bottom:1px solid var(--line)}
+.nav{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+.brand{font-weight:900;color:var(--navy)}
+.logo{display:inline-grid;place-items:center;background:var(--teal);color:white;width:38px;height:38px;border-radius:11px;margin-right:8px}
+.links{display:flex;gap:16px;flex-wrap:wrap;font-weight:700;font-size:.9rem}
+.hero{background:linear-gradient(120deg,#f3f7fb,#eaf7f4);padding:65px 0;text-align:center}
+h1,h2,h3{color:var(--navy)}
+h1{font-size:clamp(2.3rem,5vw,3.5rem);margin:10px}
+.tag{color:#147c71;font-weight:900;text-transform:uppercase;letter-spacing:1px}
+section{padding:45px 0}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{border:1px solid var(--line);border-radius:17px;padding:22px}
+.muted{color:var(--muted)}
+footer{background:#10233c;color:#d4deea;padding:24px 0;margin-top:35px}
+@media(max-width:720px){.nav{padding:12px 0;flex-wrap:wrap}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="wrap nav">
+<a class="brand" href="index.html"><span class="logo">F</span>FIRST STEP ACADEMY</a>
+<nav class="links">
+<a href="index.html">Home</a>
+<a href="courses.html">Courses</a>
+<a href="about.html">About</a>
+<a href="achievements.html">Achievements</a>
+<a href="gallery.html">Gallery</a>
+<a href="contact.html">Contact</a>
+<a href="portal.html">Portal</a>
+</nav>
+</div></header>
+<main>
+<section class="hero">
+<div class="wrap">
+<span class="tag">About First Step Academy</span>
+<h1>Every learner has a first step.</h1>
+<p class="muted">Learn. Practise. Grow.</p>
+</div>
+</section>
+<section>
+<div class="wrap">
+<h2>Who We Are</h2>
+<p>First Step Academy is a learning centre committed to helping students build strong academic foundations, improve communication skills and grow with confidence.</p>
+<h2>Our Mission</h2>
+<p>To make learning clear, meaningful and accessible through individual attention, regular practice and a supportive learning environment.</p>
+<h2>Our Vision</h2>
+<p>To encourage every learner to discover their potential, develop independent thinking and move forward with confidence.</p>
+</div>
+</section>
+<section>
+<div class="wrap grid">
+<div class="card"><h3>Concept-Based Learning</h3><p class="muted">We focus on understanding concepts rather than memorising answers.</p></div>
+<div class="card"><h3>Regular Practice</h3><p class="muted">Consistent exercises and revision help students strengthen their learning.</p></div>
+<div class="card"><h3>Student Support</h3><p class="muted">We encourage questions, curiosity and steady improvement.</p></div>
+</div>
+</section>
+</main>
+<footer><div class="wrap">FIRST STEP ACADEMY · Learn. Practise. Grow.</div></footer>
+</body>
+</html>
