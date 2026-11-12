@@ -643,9 +643,10 @@ function localDate() {
 const today = localDate();
 function sectionFor(className, board) {
   const n = Number(String(className || '').replace(/\D/g, ''));
-  if (!n || !board) return '';
+  if (!n) return '';
   if (n >= 1 && n <= 5) return 'A';
   if (n >= 6 && n <= 7) return 'B';
+  if (!board) return '';
   if (n >= 8 && n <= 10 && board === 'State Board') return 'C';
   if (n >= 9 && n <= 10 && board === 'CBSE') return 'D';
   return '';
@@ -964,10 +965,11 @@ $('studentSectionSave').onclick = async () => {
   const option = $('studentSectionStudent').selectedOptions[0];
   const className = option ? option.dataset.class : '';
   const section = sectionFor(className, board);
-  if (!studentId || !board || !section) {
-    return msg('dashMsg', 'Select a student and a valid board for that class.', true);
+  const needsBoard = Number(String(className).replace(/\\D/g,'')) >= 8;
+  if (!studentId || (needsBoard && !board) || !section) {
+    return msg('dashMsg', 'Select a student and choose the correct board for Classes 8–10.', true);
   }
-  const { error } = await db.from('students').update({board_name:board,section_name:section}).eq('id',studentId);
+  const { error } = await db.from('students').update({board_name:board || null,section_name:section}).eq('id',studentId);
   if (error) return msg('dashMsg', error.message, true);
   msg('dashMsg', 'Student board and section updated successfully.');
   $('studentSectionStudent').value = '';
