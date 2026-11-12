@@ -190,6 +190,71 @@ footer {
   .fields,.grid { grid-template-columns:1fr; }
   .field.full { grid-column:auto; }
 }
+
+/* PORTAL VISUAL REFRESH */
+:root{
+  --navy:#102541;--teal:#159b8d;--ink:#1e2e43;--muted:#718096;
+  --paper:#f2f6fa;--line:#e4ebf2;
+}
+body{font-family:Inter,"Segoe UI",Arial,sans-serif;background:linear-gradient(180deg,#eaf3f7 0,#f5f7fb 310px);color:var(--ink)}
+header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);box-shadow:0 5px 24px rgba(16,37,65,.06)}
+.nav{min-height:76px}
+.brand{display:flex;align-items:center;letter-spacing:.5px;font-size:.98rem}
+.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#18b5a3,#11796f);box-shadow:0 7px 16px rgba(21,155,141,.22)}
+.links a{padding:8px 10px;border-radius:9px;transition:.2s}
+.links a:hover{background:#eaf5f4;color:#087d72}
+section{padding:48px 0 58px}
+.head{margin-bottom:30px}
+.head h2{font-size:clamp(2rem,4vw,2.65rem);letter-spacing:-1px;margin:7px 0;color:#102541}
+.head p{font-size:1.02rem}
+.tag{font-size:.72rem;letter-spacing:1.6px}
+.panel{border:1px solid rgba(220,231,239,.95);border-radius:20px;padding:25px;margin:18px auto;box-shadow:0 10px 32px rgba(20,43,74,.055);background:rgba(255,255,255,.97)}
+.login-panel{padding:30px;box-shadow:0 18px 50px rgba(20,43,74,.10)}
+.login-panel h3,.panel h3{color:var(--navy);font-size:1.22rem;margin:0 0 18px;letter-spacing:-.2px}
+.btn{background:linear-gradient(135deg,#19aa9b,#117f75);padding:12px 21px;border-radius:11px;box-shadow:0 6px 14px rgba(21,155,141,.18);transition:transform .18s,box-shadow .18s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 9px 20px rgba(21,155,141,.24)}
+.btn.secondary{background:var(--navy);box-shadow:0 6px 14px rgba(16,37,65,.14)}
+.field label{font-size:.8rem;letter-spacing:.15px;color:#344963}
+.field input,.field select,.field textarea{border:1px solid #dce5ed;border-radius:11px;padding:12px 13px;outline:none;transition:border-color .18s,box-shadow .18s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#159b8d;box-shadow:0 0 0 3px rgba(21,155,141,.12)}
+.fields{gap:15px}
+.tabs{gap:9px;padding:7px;background:#f1f5f8;border:1px solid var(--line);border-radius:14px;width:max-content;max-width:100%}
+.tabs button{border:0;border-radius:10px;padding:10px 15px;background:transparent;transition:.18s}
+.tabs button:hover{background:#e3eeef}
+.tabs button.active{background:var(--navy);box-shadow:0 4px 10px rgba(16,37,65,.16)}
+.stat{background:linear-gradient(145deg,#eef8f6,#f6fbfb);border:1px solid #dcefeb;padding:18px;border-radius:15px}
+.stat span{font-size:.84rem;color:#617487}
+.stat b{font-size:1.8rem;margin-top:4px}
+.grid{gap:14px}
+.tableWrap{border:1px solid var(--line);border-radius:13px;margin-top:14px}
+table{margin:0;background:white}
+th{background:#f3f7fa;font-size:.8rem;text-transform:uppercase;letter-spacing:.45px}
+td,th{padding:12px 13px;border-bottom:1px solid #edf1f5}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#f8fbfc}
+.notice{border:1px solid #d6eee8}
+.error{border-color:#f4d6d2}
+footer{background:#102541;margin-top:20px;padding:27px 0}
+#dashboard>.panel:first-child{background:linear-gradient(120deg,#102541,#1a4562);color:white;border:0}
+#dashboard>.panel:first-child h3{color:white;font-size:1.45rem;margin:0}
+#dashboard>.panel:first-child .tag{color:#76e0d2}
+#dashboard>.panel:first-child .btn.secondary{background:white;color:#102541;box-shadow:none}
+#dashMsg:empty{display:none}
+@media(max-width:720px){
+  .nav{padding:12px 0;gap:10px}
+  .links{width:100%;overflow-x:auto;flex-wrap:nowrap;padding:3px 0 7px}
+  .links a{white-space:nowrap}
+  section{padding:30px 0 42px}
+  .head h2{font-size:2rem}
+  .panel{padding:18px;border-radius:16px}
+  .login-panel{padding:22px}
+  .tabs{width:100%;overflow-x:auto;flex-wrap:nowrap}
+  .tabs button{white-space:nowrap}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .btn{max-width:100%}
+}
+@media(max-width:390px){.grid{grid-template-columns:1fr}.brand{font-size:.87rem}}
+
 </style>
 </head>
 
