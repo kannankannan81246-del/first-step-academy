@@ -481,6 +481,15 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         <div class="panel hidden" id="studentsList">
           <h3>Student Records</h3>
           <div id="studentsTable"></div>
+          <div class="panel" style="margin-top:18px">
+            <h3>Update Existing Student Section</h3>
+            <p class="muted">Choose the student's correct board. The section will be assigned automatically.</p>
+            <div class="fields">
+              <div class="field"><label>Select Student</label><select id="studentSectionStudent"><option value="">Select student</option></select></div>
+              <div class="field"><label>Board</label><select id="studentSectionBoard"><option value="">Select Board</option><option>State Board</option><option>CBSE</option></select></div>
+            </div>
+            <button class="btn" id="studentSectionSave">Save Student Section</button>
+          </div>
         </div>
 
         <!-- CLASS ASSIGNMENT -->
@@ -506,6 +515,8 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 
           <button class="btn" id="assignSave">Assign Section</button>
           <div id="assignRecords"></div>
+        </div>
+
         <div class="panel hidden" id="adminLeaves">
           <h3>Leave Requests</h3>
           <p class="muted">Review student and staff leave requests.</p>
@@ -804,12 +815,16 @@ async function loadAdmin() {
 
   const { data: students, error } = await db
     .from('students')
-    .select('student_code,full_name,class_name,board_name,section_name,guardian_name,guardian_phone,active')
+    .select('id,student_code,full_name,class_name,board_name,section_name,guardian_name,guardian_phone,active')
     .order('full_name');
 
   if (error) {
     msg('dashMsg', error.message, true);
   } else {
+    $('studentSectionStudent').innerHTML = '<option value="">Select student</option>' + (students || []).map(s =>
+      '<option value="' + esc(s.id) + '" data-class="' + esc(s.class_name) + '">' +
+      esc(s.full_name) + ' · ' + esc(s.student_code) + ' · ' + esc(s.class_name) + '</option>'
+    ).join('');
     showTable(
       'studentsTable',
       ['Code', 'Student', 'Class', 'Board', 'Section', 'Guardian', 'Contact', 'Active'],
@@ -941,6 +956,23 @@ $('adSave').onclick = async () => {
     $('adClass').value = '';
     await loadAdmin();
   }
+};
+
+$('studentSectionSave').onclick = async () => {
+  const studentId = $('studentSectionStudent').value;
+  const board = $('studentSectionBoard').value;
+  const option = $('studentSectionStudent').selectedOptions[0];
+  const className = option ? option.dataset.class : '';
+  const section = sectionFor(className, board);
+  if (!studentId || !board || !section) {
+    return msg('dashMsg', 'Select a student and a valid board for that class.', true);
+  }
+  const { error } = await db.from('students').update({board_name:board,section_name:section}).eq('id',studentId);
+  if (error) return msg('dashMsg', error.message, true);
+  msg('dashMsg', 'Student board and section updated successfully.');
+  $('studentSectionStudent').value = '';
+  $('studentSectionBoard').value = '';
+  await loadAdmin();
 };
 
 /* SAVE STAFF ATTENDANCE */
@@ -1160,29 +1192,11 @@ async function loadAdminExtras() {
 }
 async function reviewLeave(id,status) {
   const note=prompt('Optional note for this decision:')||null;
-  const {data:request,error:requestError}=await db.from('leave_requests')
-    .select('requester_user_id,requester_role,start_date,end_date')
-    .eq('id',id).single();
-  if(requestError) return msg('dashMsg','Could not load leave request: '+requestError.message,true);
   const {error}=await db.from('leave_requests').update({
     status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()
   }).eq('id',id);
   if(error) return msg('dashMsg',error.message,true);
-
-  const decisionText = status === 'Approved' ? 'approved' : 'not approved';
-  const details = 'Your leave request ('+request.start_date+' to '+request.end_date+') has been '+decisionText+'.'
-    +(note ? ' Admin note: '+note : '');
-  const {error:notifyError}=await db.from('portal_notifications').insert({
-    recipient_user_id:request.requester_user_id,
-    title:'Leave request '+status,
-    message:details,
-    related_leave_id:id
-  });
-  if(notifyError) {
-    msg('dashMsg','Leave decision saved, but notification could not be created: '+notifyError.message,true);
-  } else {
-    msg('dashMsg','Leave request '+status.toLowerCase()+'. Notification sent to the user portal.');
-  }
+  msg('dashMsg','Leave request '+status.toLowerCase()+'. A portal notification has been created automatically.');
   await loadAdminExtras();
 }
 async function submitLeave(role,studentId,startId,endId,reasonId,historyId) {
