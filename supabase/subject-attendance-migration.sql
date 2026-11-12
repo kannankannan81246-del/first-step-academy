@@ -32,7 +32,7 @@ create table if not exists public.staff_subject_assignments(
 );
 alter table public.staff_subject_assignments enable row level security;
 revoke all on public.staff_subject_assignments from anon;
-grant select,insert,delete on public.staff_subject_assignments to authenticated;
+grant select,insert,update,delete on public.staff_subject_assignments to authenticated;
 
 create or replace function private.is_assigned_subject(target_subject text)
 returns boolean language sql stable security definer set search_path=pg_catalog
@@ -44,11 +44,15 @@ revoke all on function private.is_assigned_subject(text) from public,anon;
 grant execute on function private.is_assigned_subject(text) to authenticated;
 
 drop policy if exists staff_subject_assignments_admin_manage on public.staff_subject_assignments;
-create policy staff_subject_assignments_admin_manage on public.staff_subject_assignments
-for all to authenticated using(private.is_academy_admin()) with check(private.is_academy_admin());
 drop policy if exists staff_subject_assignments_staff_read_own on public.staff_subject_assignments;
-create policy staff_subject_assignments_staff_read_own on public.staff_subject_assignments
-for select to authenticated using(staff_id=(select auth.uid()));
+create policy staff_subject_assignments_read on public.staff_subject_assignments
+for select to authenticated using(private.is_academy_admin() or staff_id=(select auth.uid()));
+create policy staff_subject_assignments_admin_insert on public.staff_subject_assignments
+for insert to authenticated with check(private.is_academy_admin());
+create policy staff_subject_assignments_admin_update on public.staff_subject_assignments
+for update to authenticated using(private.is_academy_admin()) with check(private.is_academy_admin());
+create policy staff_subject_assignments_admin_delete on public.staff_subject_assignments
+for delete to authenticated using(private.is_academy_admin());
 
 alter table public.attendance alter column subject_name set default '';
 alter table public.attendance alter column subject_name set not null;
@@ -57,69 +61,71 @@ drop index if exists public.attendance_student_id_attendance_date_key;
 create unique index if not exists attendance_student_date_subject_uidx
   on public.attendance(student_id,attendance_date,subject_name);
 
-drop policy if exists "admin or assigned staff read roster" on public.student_roster;
-create policy "admin or assigned staff read roster" on public.student_roster
+drop policy if exists "admin manage student attendance" on public.attendance;
+drop policy if exists "staff mark assigned class attendance" on public.attendance;
+drop policy if exists "student read own attendance" on public.attendance;
+drop policy if exists staff_read_own_attendance_for_upsert on public.attendance;
+drop policy if exists staff_update_own_assigned_attendance on public.attendance;
+
+create policy attendance_select_scoped on public.attendance
 for select to authenticated using (
   private.is_academy_admin()
-  or (active=true and (
-    (section_name is not null and private.is_assigned_to('Section '||section_name)
-      and class_name not in ('Class 11','Class 12'))
-    or (class_name in ('Class 11','Class 12') and exists (
-      select 1 from unnest(coalesce(subjects,'{}'::text[])) as student_subject
-      where private.is_assigned_subject(student_subject)
-    ))
-  ))
+  or marked_by=(select auth.uid())
+  or exists(select 1 from public.students s where s.id=attendance.student_id and s.auth_user_id=(select auth.uid()))
 );
 
-drop policy if exists "staff mark assigned class attendance" on public.attendance;
-create policy "staff mark assigned class attendance" on public.attendance
+create policy attendance_insert_scoped on public.attendance
 for insert to authenticated with check (
-  marked_by=(select auth.uid()) and exists (
-    select 1 from public.student_roster r
-    where r.student_id=attendance.student_id and r.class_name=attendance.class_name and r.active=true
-    and (
-      (r.class_name in ('Class 1','Class 2','Class 3','Class 4','Class 5','Class 6','Class 7','Class 8')
-        and attendance.subject_name='' and r.section_name is not null
-        and private.is_assigned_to('Section '||r.section_name))
-      or
-      (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-        and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
-        and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
-      or
-      (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-        and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
-        and private.is_assigned_subject(attendance.subject_name))
+  private.is_academy_admin()
+  or (
+    marked_by=(select auth.uid()) and exists (
+      select 1 from public.student_roster r
+      where r.student_id=attendance.student_id and r.class_name=attendance.class_name and r.active=true
+      and (
+        (r.class_name in ('Class 1','Class 2','Class 3','Class 4','Class 5','Class 6','Class 7','Class 8')
+          and attendance.subject_name='' and r.section_name is not null
+          and private.is_assigned_to('Section '||r.section_name))
+        or
+        (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
+          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
+        or
+        (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
+          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and private.is_assigned_subject(attendance.subject_name))
+      )
     )
   )
 );
 
-drop policy if exists staff_read_own_attendance_for_upsert on public.attendance;
-create policy staff_read_own_attendance_for_upsert on public.attendance
-for select to authenticated using(marked_by=(select auth.uid()));
-
-drop policy if exists staff_update_own_assigned_attendance on public.attendance;
-create policy staff_update_own_assigned_attendance on public.attendance
-for update to authenticated using(marked_by=(select auth.uid()))
+create policy attendance_update_scoped on public.attendance
+for update to authenticated
+using(private.is_academy_admin() or marked_by=(select auth.uid()))
 with check (
-  marked_by=(select auth.uid()) and exists (
-    select 1 from public.student_roster r
-    where r.student_id=attendance.student_id and r.class_name=attendance.class_name and r.active=true
-    and (
-      (r.class_name in ('Class 1','Class 2','Class 3','Class 4','Class 5','Class 6','Class 7','Class 8')
-        and attendance.subject_name='' and r.section_name is not null
-        and private.is_assigned_to('Section '||r.section_name))
-      or
-      (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-        and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
-        and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
-      or
-      (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-        and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
-        and private.is_assigned_subject(attendance.subject_name))
+  private.is_academy_admin()
+  or (
+    marked_by=(select auth.uid()) and exists (
+      select 1 from public.student_roster r
+      where r.student_id=attendance.student_id and r.class_name=attendance.class_name and r.active=true
+      and (
+        (r.class_name in ('Class 1','Class 2','Class 3','Class 4','Class 5','Class 6','Class 7','Class 8')
+          and attendance.subject_name='' and r.section_name is not null
+          and private.is_assigned_to('Section '||r.section_name))
+        or
+        (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
+          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
+        or
+        (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
+          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and private.is_assigned_subject(attendance.subject_name))
+      )
     )
   )
 );
-grant select,insert,update on public.attendance to authenticated;
+create policy attendance_delete_admin on public.attendance
+for delete to authenticated using(private.is_academy_admin());
+grant select,insert,update,delete on public.attendance to authenticated;
 
 notify pgrst,'reload schema';
 commit;
