@@ -70,30 +70,6 @@ create unique index if not exists staff_class_assignments_one_staff_per_section_
   on public.staff_class_assignments(class_name);
 
 -- Portal feature tables.
-create table if not exists public.leave_requests (
-  id uuid primary key default gen_random_uuid(),
-  requester_user_id uuid not null references auth.users(id) on delete cascade,
-  requester_role text not null check (requester_role in ('student','staff')),
-  student_id uuid references public.students(id) on delete set null,
-  start_date date not null,
-  end_date date not null,
-  reason text not null,
-  status text not null default 'Pending' check (status in ('Pending','Approved','Rejected')),
-  admin_note text,
-  reviewed_by uuid references auth.users(id) on delete set null,
-  reviewed_at timestamptz,
-  created_at timestamptz not null default now(),
-  constraint leave_dates_valid check (end_date >= start_date),
-  constraint student_request_has_student check (
-    (requester_role = 'student' and student_id is not null) or
-    (requester_role = 'staff' and student_id is null)
-  )
-);
-create index if not exists leave_requests_requester_idx on public.leave_requests(requester_user_id,created_at desc);
-create index if not exists leave_requests_status_idx on public.leave_requests(status,created_at desc);
-create index if not exists leave_requests_student_id_idx on public.leave_requests(student_id);
-create index if not exists leave_requests_reviewed_by_idx on public.leave_requests(reviewed_by);
-
 create table if not exists public.academy_notices (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -121,24 +97,11 @@ create index if not exists student_achievements_date_idx on public.student_achie
 create index if not exists student_achievements_student_id_idx on public.student_achievements(student_id);
 create index if not exists student_achievements_created_by_idx on public.student_achievements(created_by);
 
-create table if not exists public.portal_notifications (
-  id uuid primary key default gen_random_uuid(),
-  recipient_user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
-  message text not null,
-  related_leave_id uuid references public.leave_requests(id) on delete set null,
-  is_read boolean not null default false,
-  created_at timestamptz not null default now()
-);
-create index if not exists portal_notifications_recipient_created_idx on public.portal_notifications(recipient_user_id,created_at desc);
-create index if not exists portal_notifications_related_leave_id_idx on public.portal_notifications(related_leave_id);
 create index if not exists attendance_marked_by_idx on public.attendance(marked_by);
 create index if not exists staff_attendance_marked_by_idx on public.staff_attendance(marked_by);
 
-alter table public.leave_requests enable row level security;
 alter table public.academy_notices enable row level security;
 alter table public.student_achievements enable row level security;
-alter table public.portal_notifications enable row level security;
 
 -- Keep SECURITY DEFINER authorization helpers outside the exposed public API schema.
 create schema if not exists private;
@@ -214,33 +177,6 @@ for select to authenticated using (auth_user_id=(select auth.uid()));
 revoke all on function public.is_academy_admin() from public,anon,authenticated;
 revoke all on function public.is_assigned_to(text) from public,anon,authenticated;
 
--- Leave requests: requester reads own, admin reviews; only linked students/staff can submit.
-drop policy if exists leave_select_own_or_admin on public.leave_requests;
-create policy leave_select_own_or_admin on public.leave_requests
-for select to authenticated
-using (requester_user_id = (select auth.uid()) or private.is_academy_admin());
-
-drop policy if exists leave_insert_own on public.leave_requests;
-create policy leave_insert_own on public.leave_requests
-for insert to authenticated
-with check (
-  requester_user_id = (select auth.uid())
-  and status = 'Pending' and reviewed_by is null
-  and exists (select 1 from public.profiles p where p.id=(select auth.uid()) and p.role=requester_role and p.role in ('student','staff'))
-  and (
-    (requester_role='staff' and student_id is null)
-    or (requester_role='student' and exists (
-      select 1 from public.students s where s.id=student_id and s.auth_user_id=(select auth.uid())
-    ))
-  )
-);
-
-drop policy if exists leave_admin_review on public.leave_requests;
-create policy leave_admin_review on public.leave_requests
-for update to authenticated using (private.is_academy_admin())
-with check (private.is_academy_admin());
-
--- Notices: published audience-specific reading, admin-only management.
 drop policy if exists notices_read_for_audience on public.academy_notices;
 create policy notices_read_for_audience on public.academy_notices
 for select to authenticated
@@ -277,43 +213,7 @@ drop policy if exists achievements_admin_delete on public.student_achievements;
 create policy achievements_admin_delete on public.student_achievements
 for delete to authenticated using (private.is_academy_admin());
 
--- Notifications are created only by the database trigger; users may only mark their own as read.
-drop policy if exists notifications_read_own_or_admin on public.portal_notifications;
-create policy notifications_read_own_or_admin on public.portal_notifications
-for select to authenticated using (recipient_user_id=(select auth.uid()) or private.is_academy_admin());
-drop policy if exists notifications_update_own_read_status on public.portal_notifications;
-create policy notifications_update_own_read_status on public.portal_notifications
-for update to authenticated using (recipient_user_id=(select auth.uid()))
-with check (recipient_user_id=(select auth.uid()));
 
-revoke all on public.leave_requests,public.academy_notices,public.student_achievements,public.portal_notifications from anon;
-grant select,insert,update on public.leave_requests to authenticated;
-grant select,insert,update,delete on public.academy_notices to authenticated;
-grant select,insert,update,delete on public.student_achievements to authenticated;
-grant select on public.portal_notifications to authenticated;
-revoke insert,update,delete on public.portal_notifications from authenticated;
-grant update (is_read) on public.portal_notifications to authenticated;
-grant select (id,title,description,achievement_date) on public.student_achievements to anon;
-
-create or replace function public.notify_leave_decision()
-returns trigger language plpgsql security definer set search_path=public
-as $fn$
-declare decision_text text; details text;
-begin
-  if old.status='Pending' and new.status in ('Approved','Rejected') then
-    decision_text := case when new.status='Approved' then 'approved' else 'not approved' end;
-    details := 'Your leave request ('||new.start_date::text||' to '||new.end_date::text||') has been '||decision_text||
-      case when new.admin_note is not null and length(trim(new.admin_note))>0 then ' Admin note: '||new.admin_note else '' end;
-    insert into public.portal_notifications(recipient_user_id,title,message,related_leave_id)
-    values(new.requester_user_id,'Leave request '||new.status,details,new.id);
-  end if;
-  return new;
-end;
-$fn$;
-revoke all on function public.notify_leave_decision() from public,anon,authenticated;
-drop trigger if exists leave_decision_notification on public.leave_requests;
-create trigger leave_decision_notification after update of status on public.leave_requests
-for each row execute function public.notify_leave_decision();
 
 
 -- Section-aware roster access and attendance submission.
