@@ -374,6 +374,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="adminLeaves">Leave Requests</button>
           <button data-tab="adminNotices">Notices</button>
           <button data-tab="adminAchievements">Achievements</button>
+          <button data-tab="adminGallery">Gallery</button>
         </div>
 
         <!-- ADMISSION -->
@@ -572,6 +573,17 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="achievementSave">Save Achievement</button>
           <div id="achievementAdminList"></div>
         </div>
+        <div class="panel hidden" id="adminGallery">
+          <h3>Manage Academy Gallery</h3>
+          <p class="muted">Admin uploads are published immediately. Staff uploads appear here for approval.</p>
+          <div class="fields">
+            <div class="field"><label>Photo</label><input id="adminGalleryFile" type="file" accept="image/jpeg,image/png,image/webp"></div>
+            <div class="field"><label>Category</label><select id="adminGalleryCategory"><option>Academy Activities</option><option>Classroom Moments</option><option>Events</option><option>Celebrations</option><option>Achievements</option></select></div>
+            <div class="field full"><label>Caption</label><input id="adminGalleryCaption" maxlength="140" placeholder="Write a short caption"></div>
+          </div>
+          <button class="btn" id="adminGalleryUpload">Upload & Publish Photo</button>
+          <div id="adminGalleryList"></div>
+        </div>
       </div>
 
       <!-- STAFF DASHBOARD -->
@@ -613,6 +625,17 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
           <button class="btn" id="staffLeaveSubmit">Submit Leave Request</button>
           <div id="staffLeaveHistory"></div>
+        </div>
+        <div class="panel">
+          <h3>Upload Gallery Photo</h3>
+          <p class="muted">Your photo will be sent to the admin for approval before appearing publicly.</p>
+          <div class="fields">
+            <div class="field"><label>Photo</label><input id="staffGalleryFile" type="file" accept="image/jpeg,image/png,image/webp"></div>
+            <div class="field"><label>Category</label><select id="staffGalleryCategory"><option>Academy Activities</option><option>Classroom Moments</option><option>Events</option><option>Celebrations</option><option>Achievements</option></select></div>
+            <div class="field full"><label>Caption</label><input id="staffGalleryCaption" maxlength="140" placeholder="Write a short caption"></div>
+          </div>
+          <button class="btn" id="staffGalleryUpload">Submit Photo for Approval</button>
+          <div id="staffGalleryList"></div>
         </div>
         <div class="panel"><h3>My Notifications</h3><div id="staffNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="staffNotices"></div></div>
@@ -964,7 +987,7 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements', 'adminGallery']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
@@ -1211,6 +1234,7 @@ async function loadStaff() {
     rosterRows = [];
   };
   await loadOwnLeave('staff','staffLeaveHistory');
+  await loadGalleryManager('staff');
 }
 
 /* LOAD STUDENT ROSTER */
@@ -1348,6 +1372,7 @@ async function loadAdminExtras() {
   const {data:achievements,error:ae}=await db.from('student_achievements').select('*').order('achievement_date',{ascending:false});
   if(ae) msg('dashMsg','Achievements: '+ae.message,true);
   $('achievementAdminList').innerHTML=(achievements||[]).map(a=>'<div class="panel"><b>'+esc(a.student_name)+' — '+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements added.</p>';
+  await loadGalleryManager('admin');
 }
 async function reviewLeave(id,status) {
   const note=prompt('Optional note for this decision:')||null;
@@ -1434,6 +1459,76 @@ $('achievementSave').onclick=async()=>{
   msg('dashMsg','Achievement saved.');
   await loadAdminExtras();
 };
+
+
+/* ACADEMY GALLERY UPLOADS */
+const GALLERY_BUCKET = 'academy-gallery';
+function galleryPublicUrl(path) {
+  return db.storage.from(GALLERY_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+async function uploadGalleryPhoto(role) {
+  const prefix = role === 'admin' ? 'admin' : 'staff';
+  const file = $(prefix+'GalleryFile').files[0];
+  const caption = $(prefix+'GalleryCaption').value.trim();
+  const category = $(prefix+'GalleryCategory').value;
+  if (!file) return msg('dashMsg','Choose a photo first.',true);
+  if (!['image/jpeg','image/png','image/webp'].includes(file.type)) return msg('dashMsg','Use a JPG, PNG or WebP image.',true);
+  if (file.size > 8*1024*1024) return msg('dashMsg','Photo must be 8 MB or smaller.',true);
+  const safeName = file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,'-');
+  const path = user.id+'/'+Date.now()+'-'+safeName;
+  const {error:uploadError} = await db.storage.from(GALLERY_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+  if(uploadError) return msg('dashMsg','Photo upload failed: '+uploadError.message,true);
+  const published = role === 'admin';
+  const {error:insertError} = await db.from('gallery_photos').insert({
+    caption,category,image_path:path,published,created_by:user.id
+  });
+  if(insertError) {
+    await db.storage.from(GALLERY_BUCKET).remove([path]);
+    return msg('dashMsg','Photo details could not be saved: '+insertError.message,true);
+  }
+  $(prefix+'GalleryFile').value='';
+  $(prefix+'GalleryCaption').value='';
+  msg('dashMsg',published?'Photo uploaded and published to the website gallery.':'Photo submitted. It will appear after admin approval.');
+  await loadGalleryManager(role);
+}
+async function removeGalleryPhoto(id,path) {
+  if(!confirm('Delete this gallery photo permanently?')) return;
+  const {error:storageError}=await db.storage.from(GALLERY_BUCKET).remove([path]);
+  if(storageError) return msg('dashMsg','Could not delete photo file: '+storageError.message,true);
+  const {error}=await db.from('gallery_photos').delete().eq('id',id);
+  if(error) return msg('dashMsg',error.message,true);
+  msg('dashMsg','Gallery photo deleted.');
+  await loadGalleryManager(profile.role);
+}
+async function setGalleryPublished(id,published) {
+  const {error}=await db.from('gallery_photos').update({published}).eq('id',id);
+  if(error) return msg('dashMsg',error.message,true);
+  msg('dashMsg',published?'Photo published.':'Photo hidden from public gallery.');
+  await loadGalleryManager('admin');
+}
+async function loadGalleryManager(role) {
+  const target=role==='admin'?'adminGalleryList':'staffGalleryList';
+  let query=db.from('gallery_photos').select('*').order('created_at',{ascending:false});
+  if(role==='staff') query=query.eq('created_by',user.id);
+  const {data,error}=await query;
+  if(error) {
+    $(target).innerHTML='<p class="muted">Gallery manager could not load: '+esc(error.message)+'</p>';
+    return;
+  }
+  const rows=data||[];
+  $(target).innerHTML=rows.length?'<div class="grid">'+rows.map(photo=>{
+    const status=photo.published?'Published':'Pending approval';
+    const actions=role==='admin'
+      ? (photo.published?'<button class="btn secondary" data-gallery-hide="'+esc(photo.id)+'">Hide</button>':'<button class="btn" data-gallery-publish="'+esc(photo.id)+'">Publish</button>')+' <button class="btn secondary" data-gallery-delete="'+esc(photo.id)+'" data-gallery-path="'+esc(photo.image_path)+'">Delete</button>'
+      : '<button class="btn secondary" data-gallery-delete="'+esc(photo.id)+'" data-gallery-path="'+esc(photo.image_path)+'">Delete</button>';
+    return '<div class="panel"><img src="'+esc(galleryPublicUrl(photo.image_path))+'" alt="'+esc(photo.caption||'Academy gallery photo')+'" style="width:100%;height:150px;object-fit:cover;border-radius:10px"><b>'+esc(photo.caption||photo.category)+'</b><p class="muted">'+esc(photo.category)+' · '+status+'</p>'+actions+'</div>';
+  }).join('')+'</div>':'<p class="muted">No gallery photos yet.</p>';
+  $(target).querySelectorAll('[data-gallery-publish]').forEach(b=>b.onclick=()=>setGalleryPublished(b.dataset.galleryPublish,true));
+  $(target).querySelectorAll('[data-gallery-hide]').forEach(b=>b.onclick=()=>setGalleryPublished(b.dataset.galleryHide,false));
+  $(target).querySelectorAll('[data-gallery-delete]').forEach(b=>b.onclick=()=>removeGalleryPhoto(b.dataset.galleryDelete,b.dataset.galleryPath));
+}
+$('adminGalleryUpload').onclick=()=>uploadGalleryPhoto('admin');
+$('staffGalleryUpload').onclick=()=>uploadGalleryPhoto('staff');
 
 /* RESTORE EXISTING LOGIN SESSION */
 db.auth.getSession().then(({ data, error }) => {
