@@ -290,6 +290,21 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 .error{background:#fff0ee;color:#a02b20;border-color:#f4d6d2}
 #dashboard>.panel:first-child{background:linear-gradient(120deg,#102541,#1b3a5b)}
 
+
+/* ADMIN TAB VISIBILITY FIX — override earlier width/overflow rules */
+#adminDash > .tabs{
+  display:flex !important;
+  width:100% !important;
+  max-width:100% !important;
+  flex-wrap:wrap !important;
+  overflow:visible !important;
+  box-sizing:border-box !important;
+}
+#adminDash > .tabs > button{
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
 </style>
 </head>
 
