@@ -29,7 +29,8 @@ main{width:min(1100px,92%);margin:36px auto}
 .btn{background:linear-gradient(135deg,#c7a45e,#9b742e);color:#fff;border:0;border-radius:11px;padding:12px 20px;font-weight:800}
 footer{background:#102541;color:#e4e9ef;padding:26px 0}
 @media(max-width:720px){header nav{display:flex;overflow-x:auto;white-space:nowrap;padding:4px 0 8px}header nav a{font-size:.82rem}main{margin:24px auto}.grid,.cards{grid-template-columns:1fr}}
-</style></head>
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
 <body>
 <header>
 <h2>FIRST STEP ACADEMY</h2>
@@ -45,11 +46,26 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
 <h1>Contact Us</h1>
 <div class="card">
 <h2>First Step Academy</h2>
-<p>We are happy to help you with course and admission enquiries.</p>
-<p><strong>Phone:</strong> Add your academy contact number</p>
-<p><strong>Email:</strong> Add your academy email address</p>
-<p><strong>Address:</strong> Add your academy address</p>
+<p data-content-key="contact_intro">We are happy to help you with course and admission enquiries.</p>
+<p><strong>Phone:</strong> <span data-content-key="contact_phone">Add your academy contact number</span></p>
+<p><strong>Email:</strong> <span data-content-key="contact_email">Add your academy email address</span></p>
+<p><strong>Address:</strong> <span data-content-key="contact_address">Add your academy address</span></p>
 </div>
 </main>
+<script>
+(async function(){
+ const url='https://zbpneflfiykvlbeolpht.supabase.co';
+ const key='sb_publishable_-bPtNntI8dUA3hzElAtETA_4Zkqa082';
+ if(!window.supabase)return;
+ const client=window.supabase.createClient(url,key);
+ const {data,error}=await client.from('website_content').select('content_key,content_value');
+ if(error||!data)return;
+ const values=Object.fromEntries(data.map(row=>[row.content_key,row.content_value]));
+ document.querySelectorAll('[data-content-key]').forEach(node=>{
+  const value=values[node.dataset.contentKey];
+  if(value!==undefined)node.textContent=value;
+ });
+})();
+</script>
 </body>
 </html>
