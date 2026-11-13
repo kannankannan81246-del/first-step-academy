@@ -65,6 +65,7 @@ main{width:min(1100px,92%);margin:36px auto}
 footer{background:#102541;color:#e4e9ef;padding:26px 0}
 @media(max-width:720px){header nav{display:flex;overflow-x:auto;white-space:nowrap;padding:4px 0 8px}header nav a{font-size:.82rem}main{margin:24px auto}.grid,.cards{grid-template-columns:1fr}}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <header>
@@ -84,9 +85,24 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
   </div>
 </header>
 <main>
-<section class="hero" id="home"><div class="wrap heroGrid"><div><span class="tag">Every learner has a first step</span><h1>Learn with confidence.<br><span>Grow with purpose.</span></h1><p>Tuition for Classes 1–10, Higher Secondary Physics, Chemistry and Mathematics, Spoken English, Grammar and Writing.</p><a class="btn" href="https://fsa-trichy.netlify.app/portal.html" onclick="window.location.assign(this.href); return false;" role="button" aria-label="Open Academy Login Portal">Academy Login <span aria-hidden="true">→</span></a></div><div class="art"><div style="font-size:3rem">✦</div><b>Your journey starts here.</b><p class="muted">LEARN · PRACTISE · GROW</p></div></div></section>
-</main><footer><div class="wrap row"><b>FIRST STEP ACADEMY · Learn. Practise. Grow.</b><span>© <span id="year"></span> First Step Academy</span></div></footer>
+<section class="hero" id="home"><div class="wrap heroGrid"><div><span class="tag">Every learner has a first step</span><h1 data-content-key="home_heading">Learn with confidence. Grow with purpose.</h1><p data-content-key="home_description">Tuition for Classes 1–10, Higher Secondary Physics, Chemistry and Mathematics, Spoken English, Grammar and Writing.</p><a class="btn" href="https://fsa-trichy.netlify.app/portal.html" onclick="window.location.assign(this.href); return false;" role="button" aria-label="Open Academy Login Portal">Academy Login <span aria-hidden="true">→</span></a></div><div class="art"><div style="font-size:3rem">✦</div><b>Your journey starts here.</b><p class="muted">LEARN · PRACTISE · GROW</p></div></div></section>
+</main><footer><div class="wrap row"><b data-content-key="footer_tagline">FIRST STEP ACADEMY · Learn. Practise. Grow.</b><span>© <span id="year"></span> First Step Academy</span></div></footer>
 <script>
 document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+<script>
+(async function(){
+ const url='https://zbpneflfiykvlbeolpht.supabase.co';
+ const key='sb_publishable_-bPtNntI8dUA3hzElAtETA_4Zkqa082';
+ if(!window.supabase)return;
+ const client=window.supabase.createClient(url,key);
+ const {data,error}=await client.from('website_content').select('content_key,content_value');
+ if(error||!data)return;
+ const values=Object.fromEntries(data.map(row=>[row.content_key,row.content_value]));
+ document.querySelectorAll('[data-content-key]').forEach(node=>{
+  const value=values[node.dataset.contentKey];
+  if(value!==undefined)node.textContent=value;
+ });
+})();
 </script>
 </body></html>
