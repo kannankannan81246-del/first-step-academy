@@ -42,12 +42,53 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
 </nav>
 </header>
 <main>
-<h1>Our Gallery</h1>
-<p>Memories, activities and special moments at First Step Academy.</p>
-<div class="gallery-box">
-<h2>Gallery Coming Soon!</h2>
-<p>Photos and videos will be displayed here.</p>
-</div>
+<section class="hero" style="padding:34px;border-radius:20px">
+  <span class="tag"><b>FIRST STEP ACADEMY</b></span>
+  <h1>Our Gallery</h1>
+  <p>Memories, activities and special moments at First Step Academy.</p>
+</section>
+<div id="galleryStatus" class="gallery-box"><h2>Loading gallery...</h2></div>
+<section id="galleryGrid" class="gallery-grid" aria-live="polite"></section>
 </main>
+<style>
+.gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:26px 0 45px}
+.gallery-card{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(16,37,65,.07)}
+.gallery-card img{display:block;width:100%;height:230px;object-fit:cover;background:#eef2f6;cursor:pointer}
+.gallery-card .gallery-caption{padding:14px 16px}
+.gallery-card h3{font-size:1rem;margin:0 0 4px}
+.gallery-card p{font-size:.88rem;color:var(--muted);margin:0}
+@media(max-width:850px){.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.gallery-grid{grid-template-columns:1fr}.gallery-card img{height:240px}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const galleryDb=window.supabase.createClient(
+  'https://zbpneflfiykvlbeolpht.supabase.co',
+  'sb_publishable_-bPtNntI8dUA3hzElAtETA_4Zkqa082'
+);
+async function loadPublicGallery(){
+  const status=document.getElementById('galleryStatus');
+  const grid=document.getElementById('galleryGrid');
+  const {data,error}=await galleryDb.from('gallery_photos')
+    .select('caption,category,image_path,created_at')
+    .eq('published',true).order('created_at',{ascending:false});
+  if(error){
+    status.innerHTML='<h2>Gallery is temporarily unavailable</h2><p>Please visit again later.</p>';
+    return;
+  }
+  if(!data||!data.length){
+    status.innerHTML='<h2>Gallery photos coming soon!</h2><p>Photos and special moments will appear here once published by the academy.</p>';
+    return;
+  }
+  status.hidden=true;
+  grid.innerHTML=data.map(photo=>{
+    const url=galleryDb.storage.from('academy-gallery').getPublicUrl(photo.image_path).data.publicUrl;
+    const caption=String(photo.caption||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+    const category=String(photo.category||'Academy Activities').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+    return '<article class="gallery-card"><img loading="lazy" src="'+url+'" alt="'+(caption||category)+'"><div class="gallery-caption"><h3>'+category+'</h3>'+(caption?'<p>'+caption+'</p>':'')+'</div></article>';
+  }).join('');
+}
+loadPublicGallery();
+</script>
 </body>
 </html>
