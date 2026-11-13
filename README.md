@@ -31,7 +31,7 @@ The homepage links to `portal.html` using a relative path. This lets the site mo
 
 For a new, empty Supabase project:
 1. Apply `supabase-setup.sql` to create the base tables and starter policies.
-2. Apply `supabase/first-step-portal-setup.sql` to add portal features, section/subject attendance, RLS, notifications, CMS and gallery.
+2. Apply `supabase/first-step-portal-setup.sql` to add portal features, section/subject attendance, RLS, CMS and gallery. Leave management and its notification workflow are intentionally excluded.
 3. Create Auth users and their matching `profiles` rows. Link student records to their Auth users through `students.auth_user_id`.
 4. Assign staff sections and senior subjects through the admin portal.
 
