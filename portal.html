@@ -530,6 +530,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
 
           <button class="btn" id="assignSave">Assign Section</button>
+          <p class="muted">To change a staff member's section, select the same staff member above and choose the new section. To remove an assignment, use Remove below.</p>
           <div id="assignRecords"></div>
           <div class="panel" style="margin-top:18px">
             <h3>Assign Subjects to Staff (Classes 11–12)</h3>
@@ -913,14 +914,23 @@ async function loadAdmin() {
       staffList.map(s => [s.id, s.full_name])
     );
 
-    showTable(
-      'assignRecords',
-      ['Staff', 'Section'],
-      (assignments || []).map(a => [
-        staffMap[a.staff_id] || a.staff_id,
-        /^Section [A-D]$/.test(a.class_name || '') ? a.class_name : 'Needs section mapping (' + (a.class_name || 'Unassigned') + ')'
-      ])
-    );
+    $('assignRecords').innerHTML = assignments.length
+      ? '<div class="tableWrap"><table><thead><tr><th>Staff</th><th>Assigned Section</th><th>Action</th></tr></thead><tbody>' +
+        assignments.map(a => '<tr><td>' + esc(staffMap[a.staff_id] || a.staff_id) + '</td><td>' +
+          esc(/^Section [A-D]$/.test(a.class_name || '') ? a.class_name : 'Needs section mapping (' + (a.class_name || 'Unassigned') + ')') +
+          '</td><td><button class="btn secondary" data-remove-class="' + esc(a.staff_id) + '" data-class-name="' + esc(a.class_name) + '">Remove</button></td></tr>').join('') +
+        '</tbody></table></div>'
+      : '<p class="muted">No staff section assignments yet.</p>';
+    $('assignRecords').querySelectorAll('[data-remove-class]').forEach(button => {
+      button.onclick = async () => {
+        if (!confirm('Remove this staff section assignment?')) return;
+        const {error:removeError} = await db.from('staff_class_assignments')
+          .delete().eq('staff_id', button.dataset.removeClass).eq('class_name', button.dataset.className);
+        if (removeError) return msg('dashMsg', removeError.message, true);
+        msg('dashMsg', 'Staff section assignment removed.');
+        await loadAdmin();
+      };
+    });
   }
 
   const staffNameMap = Object.fromEntries(staffList.map(s => [s.id, s.full_name]));
