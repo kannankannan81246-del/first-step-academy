@@ -1165,7 +1165,7 @@ $('assignSave').onclick = async () => {
 
 $('subjectAssignSave').onclick = async () => {
   const staffId = $('subjectAssignStaff').value;
-  const subject = $('subjectAssignName').value.trim().replace(/\\s+/g, ' ');
+  const subject = $('subjectAssignName').value.trim().replace(/\s+/g, ' ');
   if(!staffId || !subject) return msg('dashMsg', 'Select a staff member and enter a subject.', true);
   const {error} = await db.from('staff_subject_assignments').upsert(
     {staff_id:staffId,subject_name:subject},{onConflict:'staff_id,subject_name',ignoreDuplicates:true}
@@ -1186,7 +1186,7 @@ async function loadStaff() {
     .from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id);
   if(subjectError) return msg('dashMsg', subjectError.message, true);
 
-  const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
+  const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
   const assignedSubjects = [...new Set((subjectRows||[]).map(x=>x.subject_name).filter(Boolean))];
 
   $('myClasses').textContent = [
@@ -1263,14 +1263,14 @@ $('loadRoster').onclick = async () => {
   if(error) return msg('dashMsg',error.message,true);
 
   const matches = (data||[]).filter(student => {
-    const grade = Number(String(student.class_name||'').replace(/\\D/g,''));
+    const grade = Number(String(student.class_name||'').replace(/\D/g,''));
     const hasSubject = (student.subjects||[]).some(x=>String(x).toLowerCase()===subject.toLowerCase());
     if(grade>=1 && grade<=8) return group!=='SENIOR' && !subject;
     if(grade>=9 && grade<=10) return group!=='SENIOR' && !!subject && hasSubject;
     if(grade===11 || grade===12) return group==='SENIOR' && !!subject && hasSubject;
     return false;
   });
-  rosterRows = matches.map(student=>({...student,attendance_subject:Number(String(student.class_name).replace(/\\D/g,''))>=9?subject:''}));
+  rosterRows = matches.map(student=>({...student,attendance_subject:Number(String(student.class_name).replace(/\D/g,''))>=9?subject:''}));
 
   $('roster').innerHTML = rosterRows.length
     ? rosterRows.map(s =>
