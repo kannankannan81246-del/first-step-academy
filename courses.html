@@ -30,7 +30,8 @@ main{width:min(1100px,92%);margin:36px auto}
 .btn{background:linear-gradient(135deg,#c7a45e,#9b742e);color:#fff;border:0;border-radius:11px;padding:12px 20px;font-weight:800}
 footer{background:#102541;color:#e4e9ef;padding:26px 0}
 @media(max-width:720px){header nav{display:flex;overflow-x:auto;white-space:nowrap;padding:4px 0 8px}header nav a{font-size:.82rem}main{margin:24px auto}.grid,.cards{grid-template-columns:1fr}}
-</style></head>
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
 <body>
 <header>
 <h2>FIRST STEP ACADEMY</h2>
@@ -43,7 +44,7 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
 </nav>
 </header>
 <main>
-<h1>Our Courses</h1>
+<h1>Our Courses</h1><p data-content-key="courses_intro">Explore the learning programmes offered at First Step Academy.</p>
 <div class="group">
 <h2>Primary Section – Classes 1 to 5</h2>
 <p>All subjects with basic concept learning and practice.</p>
@@ -77,5 +78,20 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
 </ul>
 </div>
 </main>
+<script>
+(async function(){
+ const url='https://zbpneflfiykvlbeolpht.supabase.co';
+ const key='sb_publishable_-bPtNntI8dUA3hzElAtETA_4Zkqa082';
+ if(!window.supabase)return;
+ const client=window.supabase.createClient(url,key);
+ const {data,error}=await client.from('website_content').select('content_key,content_value');
+ if(error||!data)return;
+ const values=Object.fromEntries(data.map(row=>[row.content_key,row.content_value]));
+ document.querySelectorAll('[data-content-key]').forEach(node=>{
+  const value=values[node.dataset.contentKey];
+  if(value!==undefined)node.textContent=value;
+ });
+})();
+</script>
 </body>
 </html>
