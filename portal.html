@@ -375,6 +375,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="adminNotices">Notices</button>
           <button data-tab="adminAchievements">Achievements</button>
           <button data-tab="adminGallery">Gallery</button>
+          <button data-tab="websiteContent">Website Content</button>
         </div>
 
         <!-- ADMISSION -->
@@ -583,6 +584,13 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
           <button class="btn" id="adminGalleryUpload">Upload & Publish Photo</button>
           <div id="adminGalleryList"></div>
+        </div>
+        <div class="panel hidden" id="websiteContent">
+          <h3>Edit Public Website Content</h3>
+          <p class="muted">Saved content appears on public pages without a Netlify deployment.</p>
+          <div id="websiteContentFields" class="fields"></div>
+          <div class="row" style="margin-top:16px"><button class="btn" id="websiteContentSave">Save Website Changes</button><span id="websiteContentStatus" class="muted"></span></div>
+          <div id="websiteContentPreview" class="notice hidden"></div>
         </div>
       </div>
 
@@ -925,6 +933,7 @@ async function loadAdmin() {
   }
 
   await loadAdminExtras();
+  await loadWebsiteContentEditor();
 
   const { data: assignments, error: assignmentError } = await db
     .from('staff_class_assignments')
@@ -987,7 +996,7 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements', 'adminGallery']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
@@ -1460,6 +1469,45 @@ $('achievementSave').onclick=async()=>{
   await loadAdminExtras();
 };
 
+
+
+/* WEBSITE CONTENT CMS */
+const WEBSITE_FIELDS = [
+['home_heading','Home page heading','Learn with confidence. Grow with purpose.'],
+['home_description','Home page introduction','Tuition for Classes 1–10, Higher Secondary Physics, Chemistry and Mathematics, Spoken English, Grammar and Writing.'],
+['about_heading','About page heading','Every learner has a first step.'],
+['about_intro','About page introduction','Learn. Practise. Grow.'],
+['about_who_heading','About: Who We Are heading','Who We Are'],
+['about_who_text','About: Who We Are text','First Step Academy is a learning centre committed to helping students build strong academic foundations, improve communication skills and grow with confidence.'],
+['about_mission_heading','About: Mission heading','Our Mission'],
+['about_mission_text','About: Mission text','To make learning clear, meaningful and accessible through individual attention, regular practice and a supportive learning environment.'],
+['about_vision_heading','About: Vision heading','Our Vision'],
+['about_vision_text','About: Vision text','To encourage every learner to discover their potential, develop independent thinking and move forward with confidence.'],
+['contact_intro','Contact page introduction','We are happy to help you with course and admission enquiries.'],
+['contact_phone','Contact phone','Add your academy contact number'],
+['contact_email','Contact email','Add your academy email address'],
+['contact_address','Contact address','Add your academy address'],
+['courses_intro','Courses page introduction','Explore the learning programmes offered at First Step Academy.'],
+['footer_tagline','Website footer tagline','FIRST STEP ACADEMY · Learn. Practise. Grow.']
+];
+async function loadWebsiteContentEditor(){
+ const host=$('websiteContentFields'); if(!host)return;
+ const {data,error}=await db.from('website_content').select('content_key,content_value');
+ if(error){host.textContent='Website content editor could not load: '+error.message;return;}
+ const values=Object.fromEntries((data||[]).map(x=>[x.content_key,x.content_value]));
+ host.innerHTML=WEBSITE_FIELDS.map(([key,label,fallback])=>'<div class="field full"><label for="cms_'+esc(key)+'">'+esc(label)+'</label><textarea id="cms_'+esc(key)+'" data-cms-key="'+esc(key)+'" rows="'+(key.includes('text')||key.includes('description')||key.includes('address')?3:2)+'">'+esc(values[key]??fallback)+'</textarea></div>').join('');
+ $('websiteContentSave').onclick=saveWebsiteContent;
+}
+async function saveWebsiteContent(){
+ const rows=[...document.querySelectorAll('[data-cms-key]')].map(el=>({content_key:el.dataset.cmsKey,content_value:el.value.trim(),updated_by:user.id,updated_at:new Date().toISOString()}));
+ $('websiteContentSave').disabled=true;
+ const {error}=await db.from('website_content').upsert(rows,{onConflict:'content_key'});
+ $('websiteContentSave').disabled=false;
+ if(error){$('websiteContentStatus').textContent='Could not save: '+error.message;return;}
+ $('websiteContentStatus').textContent='Saved successfully. Public pages are updated.';
+ $('websiteContentPreview').classList.remove('hidden');
+ $('websiteContentPreview').textContent='Saved '+rows.length+' fields. Open the public pages to review.';
+}
 
 /* ACADEMY GALLERY UPLOADS */
 const GALLERY_BUCKET = 'academy-gallery';
