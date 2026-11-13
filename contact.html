@@ -30,18 +30,22 @@ main{width:min(1100px,92%);margin:36px auto}
 footer{background:#102541;color:#e4e9ef;padding:26px 0}
 @media(max-width:720px){header nav{display:flex;overflow-x:auto;white-space:nowrap;padding:4px 0 8px}header nav a{font-size:.82rem}main{margin:24px auto}.grid,.cards{grid-template-columns:1fr}}
 </style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--navy:#102541;--gold:#b58a3a;--ink:#243247;--muted:#718096;--line:#e7e1d5}
+.site-header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);box-shadow:0 5px 24px rgba(16,37,65,.06)}
+.site-shell{width:min(1100px,92%);min-height:76px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.site-brand{display:flex;align-items:center;gap:10px;color:var(--navy);font-weight:900;letter-spacing:.35px;white-space:nowrap;text-decoration:none}
+.site-logo{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#c7a45e,#9b742e);color:white;box-shadow:0 7px 16px rgba(181,138,58,.2)}
+.site-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.site-links a{display:inline-block;padding:8px 10px;border-radius:9px;color:var(--navy);font-size:.88rem;font-weight:700;text-decoration:none;white-space:nowrap;transition:background .18s,color .18s}
+.site-links a:hover,.site-links a[aria-current="page"]{background:#f5f0e6;color:#8b672d}
+.site-footer{background:#102541;color:#e4e9ef;padding:26px 0;margin-top:55px}
+.site-footer-inner{width:min(1100px,92%);margin:0 auto;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+@media(max-width:760px){.site-shell{min-height:auto;padding:12px 0;align-items:flex-start;flex-direction:column;gap:8px}.site-links{width:100%;overflow-x:auto;flex-wrap:nowrap;padding-bottom:5px}.site-links a{font-size:.82rem}.site-footer-inner{flex-direction:column}}
+</style>
 </head>
 <body>
-<header>
-<h2>FIRST STEP ACADEMY</h2>
-<nav>
-<a href="index.html">Home</a>
-<a href="courses.html">Courses</a>
-<a href="achievements.html">Achievements</a>
-<a href="gallery.html">Gallery</a>
-<a href="contact.html">Contact</a>
-</nav>
-</header>
+<header class="site-header"><div class="site-shell"><a class="site-brand" href="index.html"><span class="site-logo" aria-hidden="true">F</span><span>FIRST STEP ACADEMY</span></a><nav class="site-links" aria-label="Primary navigation"><a href="index.html">Home</a><a href="courses.html">Courses</a><a href="about.html">About</a><a href="achievements.html">Achievements</a><a href="gallery.html">Gallery</a><a href="contact.html" aria-current="page">Contact</a><a href="portal.html">Portal</a></nav></div></header>
 <main>
 <h1>Contact Us</h1>
 <div class="card">
@@ -67,5 +71,6 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
  });
 })();
 </script>
+<footer class="site-footer"><div class="site-footer-inner"><strong>FIRST STEP ACADEMY · Learn. Practise. Grow.</strong><span>© <span class="site-year"></span> First Step Academy</span></div></footer><script>document.querySelectorAll('.site-year').forEach(el=>el.textContent=new Date().getFullYear());</script>
 </body>
 </html>
