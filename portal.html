@@ -373,7 +373,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="staffAttendance">Staff Attendance</button>
           <button data-tab="studentsList">Students</button>
           <button data-tab="assignments">Class Assignments</button>
-          <button data-tab="adminLeaves">Leave Requests</button>
           <button data-tab="adminNotices">Notices</button>
           <button data-tab="adminAchievements">Achievements</button>
           <button data-tab="adminGallery">Gallery</button>
@@ -548,12 +547,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
         </div>
 
-        <div class="panel hidden" id="adminLeaves">
-          <h3>Leave Requests</h3>
-          <p class="muted">Review student and staff leave requests.</p>
-          <div id="adminLeaveList"></div>
-        </div>
-
         <div class="panel hidden" id="adminNotices">
           <h3>Publish a Notice</h3>
           <div class="fields">
@@ -627,16 +620,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="saveRoster">Save Student Attendance</button>
         </div>
         <div class="panel">
-          <h3>Request Leave</h3>
-          <div class="fields">
-            <div class="field"><label>From Date</label><input id="staffLeaveStart" type="date"></div>
-            <div class="field"><label>To Date</label><input id="staffLeaveEnd" type="date"></div>
-            <div class="field full"><label>Reason</label><textarea id="staffLeaveReason" rows="3"></textarea></div>
-          </div>
-          <button class="btn" id="staffLeaveSubmit">Submit Leave Request</button>
-          <div id="staffLeaveHistory"></div>
-        </div>
-        <div class="panel">
           <h3>Upload Gallery Photo</h3>
           <p class="muted">Your photo will be sent to the admin for approval before appearing publicly.</p>
           <div class="fields">
@@ -647,7 +630,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="staffGalleryUpload">Submit Photo for Approval</button>
           <div id="staffGalleryList"></div>
         </div>
-        <div class="panel"><h3>My Notifications</h3><div id="staffNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="staffNotices"></div></div>
       </div>
 
@@ -664,17 +646,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         </div>
 
         <div class="panel"><h3>My Attendance History</h3><div id="myAttendance"></div></div>
-        <div class="panel">
-          <h3>Request Leave</h3>
-          <div class="fields">
-            <div class="field"><label>From Date</label><input id="studentLeaveStart" type="date"></div>
-            <div class="field"><label>To Date</label><input id="studentLeaveEnd" type="date"></div>
-            <div class="field full"><label>Reason</label><textarea id="studentLeaveReason" rows="3"></textarea></div>
-          </div>
-          <button class="btn" id="studentLeaveSubmit">Submit Leave Request</button>
-          <div id="studentLeaveHistory"></div>
-        </div>
-        <div class="panel"><h3>My Notifications</h3><div id="studentNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="studentNotices"></div></div>
         <div class="panel"><h3>My Achievements</h3><div id="studentAchievements"></div></div>
       </div>
@@ -727,7 +698,7 @@ $('adBoard').addEventListener('change', updateAdmissionSection);
 
 
 
-['adDate', 'staffDate', 'classDate', 'achievementDate', 'staffLeaveStart', 'staffLeaveEnd', 'studentLeaveStart', 'studentLeaveEnd'].forEach(id => {
+['adDate', 'staffDate', 'classDate', 'achievementDate'].forEach(id => {
   $(id).value = today;
 });
 
@@ -846,12 +817,10 @@ async function loadDashboard() {
     $('staffDash').classList.remove('hidden');
     await loadStaff();
     await loadRoleNotices('staff');
-    await loadNotifications();
   } else if (data.role === 'student') {
     $('studentDash').classList.remove('hidden');
     await loadStudent();
     await loadRoleNotices('student');
-    await loadNotifications();
   } else {
     msg('dashMsg', 'Unknown account role.', true);
   }
@@ -998,7 +967,7 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
@@ -1244,7 +1213,6 @@ async function loadStaff() {
     $('roster').replaceChildren();
     rosterRows = [];
   };
-  await loadOwnLeave('staff','staffLeaveHistory');
   await loadGalleryManager('staff');
 }
 
@@ -1360,82 +1328,7 @@ async function loadStudent() {
   await loadStudentExtras(student);
 }
 
-/* PORTAL EXTRAS: leave, notices and achievements */
-function renderLeaveRows(target, rows, adminMode=false) {
-  if (!rows || !rows.length) { $(target).innerHTML='<p class="muted">No leave requests yet.</p>'; return; }
-  $(target).innerHTML = '<div class="tableWrap"><table><thead><tr><th>Applicant</th><th>Dates</th><th>Reason</th><th>Status</th>'+(adminMode?'<th>Action</th>':'')+'</tr></thead><tbody>'+
-    rows.map(r=>'<tr><td>'+esc(r.requester_role==='staff'?'Staff':(r.student_name||'Student'))+'</td><td>'+esc(r.start_date)+' to '+esc(r.end_date)+'</td><td>'+esc(r.reason)+'</td><td><b>'+esc(r.status)+'</b>'+(r.admin_note?'<br><small>'+esc(r.admin_note)+'</small>':'')+'</td>'+
-    (adminMode?'<td>'+(r.status==='Pending'?'<button class="btn" data-review="'+esc(r.id)+'" data-status="Approved">Approve</button> <button class="btn secondary" data-review="'+esc(r.id)+'" data-status="Rejected">Reject</button>':'—')+'</td>':'')+'</tr>').join('')+'</tbody></table></div>';
-  if(adminMode) $(target).querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewLeave(b.dataset.review,b.dataset.status));
-}
-async function loadAdminExtras() {
-  const {data: leaves,error:le}=await db.from('leave_requests').select('*').order('created_at',{ascending:false});
-  if(le) msg('dashMsg','Leave requests: '+le.message,true);
-  const {data: students}=await db.from('students').select('id,full_name,student_code').eq('active',true).order('full_name');
-  const studentMap=Object.fromEntries((students||[]).map(s=>[s.id,s.full_name]));
-  $('achievementStudent').innerHTML='<option value="">Select student</option>'+(students||[]).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code||'')+'</option>').join('');
-  renderLeaveRows('adminLeaveList',(leaves||[]).map(r=>({...r,student_name:studentMap[r.student_id]})),true);
-
-  const {data:notices,error:ne}=await db.from('academy_notices').select('*').order('created_at',{ascending:false});
-  if(ne) msg('dashMsg','Notices: '+ne.message,true);
-  $('noticeAdminList').innerHTML=(notices||[]).map(n=>'<div class="panel"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(n.audience)+' · '+esc(n.created_at)+'</small></div>').join('')||'<p class="muted">No notices published.</p>';
-
-  const {data:achievements,error:ae}=await db.from('student_achievements').select('*').order('achievement_date',{ascending:false});
-  if(ae) msg('dashMsg','Achievements: '+ae.message,true);
-  $('achievementAdminList').innerHTML=(achievements||[]).map(a=>'<div class="panel"><b>'+esc(a.student_name)+' — '+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements added.</p>';
-  await loadGalleryManager('admin');
-}
-async function reviewLeave(id,status) {
-  const note=prompt('Optional note for this decision:')||null;
-  const {error}=await db.from('leave_requests').update({
-    status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()
-  }).eq('id',id);
-  if(error) return msg('dashMsg',error.message,true);
-  msg('dashMsg','Leave request '+status.toLowerCase()+'. A portal notification has been created automatically.');
-  await loadAdminExtras();
-}
-async function submitLeave(role,studentId,startId,endId,reasonId,historyId) {
-  const start=$(startId).value,end=$(endId).value,reason=$(reasonId).value.trim();
-  if(!start||!end||!reason||end<start) return msg('dashMsg','Enter valid leave dates and reason.',true);
-  const {error}=await db.from('leave_requests').insert({requester_user_id:user.id,requester_role:role,student_id:studentId||null,start_date:start,end_date:end,reason});
-  if(error) return msg('dashMsg',error.message,true);
-  $(reasonId).value='';
-  msg('dashMsg','Leave request submitted successfully.');
-  await loadOwnLeave(role,historyId);
-}
-async function loadOwnLeave(role,target) {
-  const {data,error}=await db.from('leave_requests').select('*').eq('requester_user_id',user.id).order('created_at',{ascending:false});
-  if(error) return msg('dashMsg',error.message,true);
-  renderLeaveRows(target,data||[]);
-}
-async function loadNotifications() {
-  const target = profile.role === 'staff' ? 'staffNotifications' : 'studentNotifications';
-  const {data,error}=await db.from('portal_notifications')
-    .select('id,title,message,is_read,created_at')
-    .eq('recipient_user_id',user.id)
-    .order('created_at',{ascending:false});
-  if(error) {
-    $(target).innerHTML='<p class="muted">Notifications are not available yet. The admin may need to complete the database setup.</p>';
-    return;
-  }
-  const rows=data||[];
-  $(target).innerHTML=rows.length ? rows.map(n =>
-    '<div class="panel" style="margin:10px 0;border-left:4px solid '+(n.is_read?'#dce5ed':'#b58a3a')+'">'+
-    '<div class="row"><b>'+esc(n.title)+'</b><small>'+esc(n.created_at)+'</small></div>'+
-    '<p>'+esc(n.message)+'</p>'+
-    (n.is_read?'<small class="muted">Read</small>':'<button class="btn secondary" data-read-notification="'+esc(n.id)+'">Mark as read</button>')+
-    '</div>'
-  ).join('') : '<p class="muted">You have no notifications yet.</p>';
-  $(target).querySelectorAll('[data-read-notification]').forEach(button=>{
-    button.onclick=async()=>{
-      const {error:readError}=await db.from('portal_notifications')
-        .update({is_read:true}).eq('id',button.dataset.readNotification);
-      if(readError) return msg('dashMsg',readError.message,true);
-      await loadNotifications();
-    };
-  });
-}
-
+/* PORTAL EXTRAS: notices and achievements */
 async function loadRoleNotices(role) {
   const target=role==='staff'?'staffNotices':'studentNotices';
   const {data,error}=await db.from('academy_notices').select('title,body,audience,created_at').eq('published',true).in('audience',['all',role]).order('created_at',{ascending:false});
@@ -1443,13 +1336,10 @@ async function loadRoleNotices(role) {
   $(target).innerHTML=(data||[]).map(n=>'<div class="panel"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(n.created_at)+'</small></div>').join('')||'<p class="muted">No new notices.</p>';
 }
 async function loadStudentExtras(student) {
-  $('studentLeaveSubmit').onclick=()=>submitLeave('student',student.id,'studentLeaveStart','studentLeaveEnd','studentLeaveReason','studentLeaveHistory');
-  await loadOwnLeave('student','studentLeaveHistory');
   const {data,error}=await db.from('student_achievements').select('student_name,title,description,achievement_date').eq('published',true).eq('student_id',student.id).order('achievement_date',{ascending:false});
   if(error) return msg('dashMsg',error.message,true);
   $('studentAchievements').innerHTML=(data||[]).map(a=>'<div class="panel"><b>'+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements posted yet.</p>';
 }
-$('staffLeaveSubmit').onclick=()=>submitLeave('staff',null,'staffLeaveStart','staffLeaveEnd','staffLeaveReason','staffLeaveHistory');
 $('noticePublish').onclick=async()=>{
   const title=$('noticeTitle').value.trim(),body=$('noticeBody').value.trim();
   if(!title||!body) return msg('dashMsg','Enter a notice title and details.',true);
