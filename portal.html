@@ -1329,6 +1329,22 @@ async function loadStudent() {
 }
 
 /* PORTAL EXTRAS: notices and achievements */
+async function loadAdminExtras() {
+  const {data: students, error: studentError}=await db.from('students')
+    .select('id,full_name,student_code').eq('active',true).order('full_name');
+  if(studentError) msg('dashMsg','Students: '+studentError.message,true);
+  $('achievementStudent').innerHTML='<option value="">Select student</option>'+(students||[])
+    .map(student=>'<option value="'+esc(student.id)+'">'+esc(student.full_name)+' · '+esc(student.student_code||'')+'</option>').join('');
+
+  const {data:notices,error:noticeError}=await db.from('academy_notices').select('*').order('created_at',{ascending:false});
+  if(noticeError) msg('dashMsg','Notices: '+noticeError.message,true);
+  $('noticeAdminList').innerHTML=(notices||[]).map(notice=>'<div class="panel"><b>'+esc(notice.title)+'</b><p>'+esc(notice.body)+'</p><small>'+esc(notice.audience)+' · '+esc(notice.created_at)+'</small></div>').join('')||'<p class="muted">No notices published.</p>';
+
+  const {data:achievements,error:achievementError}=await db.from('student_achievements').select('*').order('achievement_date',{ascending:false});
+  if(achievementError) msg('dashMsg','Achievements: '+achievementError.message,true);
+  $('achievementAdminList').innerHTML=(achievements||[]).map(item=>'<div class="panel"><b>'+esc(item.student_name)+' — '+esc(item.title)+'</b><p>'+esc(item.description||'')+'</p><small>'+esc(item.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements added.</p>';
+  await loadGalleryManager('admin');
+}
 async function loadRoleNotices(role) {
   const target=role==='staff'?'staffNotices':'studentNotices';
   const {data,error}=await db.from('academy_notices').select('title,body,audience,created_at').eq('published',true).in('audience',['all',role]).order('created_at',{ascending:false});
