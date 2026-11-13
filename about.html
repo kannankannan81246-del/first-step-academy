@@ -42,7 +42,8 @@ main{width:min(1100px,92%);margin:36px auto}
 .btn{background:linear-gradient(135deg,#c7a45e,#9b742e);color:#fff;border:0;border-radius:11px;padding:12px 20px;font-weight:800}
 footer{background:#102541;color:#e4e9ef;padding:26px 0}
 @media(max-width:720px){header nav{display:flex;overflow-x:auto;white-space:nowrap;padding:4px 0 8px}header nav a{font-size:.82rem}main{margin:24px auto}.grid,.cards{grid-template-columns:1fr}}
-</style></head>
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
 <body>
 <header><div class="wrap nav">
 <a class="brand" href="index.html"><span class="logo">F</span>FIRST STEP ACADEMY</a>
@@ -60,18 +61,18 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
 <section class="hero">
 <div class="wrap">
 <span class="tag">About First Step Academy</span>
-<h1>Every learner has a first step.</h1>
-<p class="muted">Learn. Practise. Grow.</p>
+<h1 data-content-key="about_heading">Every learner has a first step.</h1>
+<p class="muted" data-content-key="about_intro">Learn. Practise. Grow.</p>
 </div>
 </section>
 <section>
 <div class="wrap">
-<h2>Who We Are</h2>
-<p>First Step Academy is a learning centre committed to helping students build strong academic foundations, improve communication skills and grow with confidence.</p>
-<h2>Our Mission</h2>
-<p>To make learning clear, meaningful and accessible through individual attention, regular practice and a supportive learning environment.</p>
-<h2>Our Vision</h2>
-<p>To encourage every learner to discover their potential, develop independent thinking and move forward with confidence.</p>
+<h2 data-content-key="about_who_heading">Who We Are</h2>
+<p data-content-key="about_who_text">First Step Academy is a learning centre committed to helping students build strong academic foundations, improve communication skills and grow with confidence.</p>
+<h2 data-content-key="about_mission_heading">Our Mission</h2>
+<p data-content-key="about_mission_text">To make learning clear, meaningful and accessible through individual attention, regular practice and a supportive learning environment.</p>
+<h2 data-content-key="about_vision_heading">Our Vision</h2>
+<p data-content-key="about_vision_text">To encourage every learner to discover their potential, develop independent thinking and move forward with confidence.</p>
 </div>
 </section>
 <section>
@@ -83,5 +84,20 @@ footer{background:#102541;color:#e4e9ef;padding:26px 0}
 </section>
 </main>
 <footer><div class="wrap">FIRST STEP ACADEMY · Learn. Practise. Grow.</div></footer>
+<script>
+(async function(){
+ const url='https://zbpneflfiykvlbeolpht.supabase.co';
+ const key='sb_publishable_-bPtNntI8dUA3hzElAtETA_4Zkqa082';
+ if(!window.supabase)return;
+ const client=window.supabase.createClient(url,key);
+ const {data,error}=await client.from('website_content').select('content_key,content_value');
+ if(error||!data)return;
+ const values=Object.fromEntries(data.map(row=>[row.content_key,row.content_value]));
+ document.querySelectorAll('[data-content-key]').forEach(node=>{
+  const value=values[node.dataset.contentKey];
+  if(value!==undefined)node.textContent=value;
+ });
+})();
+</script>
 </body>
 </html>
