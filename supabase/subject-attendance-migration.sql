@@ -120,11 +120,19 @@ for insert to authenticated with check (
           and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and private.is_assigned_subject(attendance.subject_name))
       )
     )
@@ -147,11 +155,19 @@ with check (
           and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and private.is_assigned_subject(attendance.subject_name))
       )
     )
