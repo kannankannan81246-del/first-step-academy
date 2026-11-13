@@ -1,5 +1,3 @@
--- This legacy migration is superseded by first-step-portal-setup.sql.
--- Use the consolidated setup file for the current First Step Academy schema.
--- It includes leave requests, notices, achievements, notification triggers,
--- section-aware roster access, private authorization helpers and RLS policies.
--- Do not apply this legacy file separately.
+-- Legacy migration retained for compatibility; do not apply separately.
+-- The consolidated first-step-portal-setup.sql is the current schema source.
+-- Leave management and its notification workflow have been removed from the product.
