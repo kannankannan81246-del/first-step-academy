@@ -17,7 +17,7 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 - Subject-based attendance for Classes 9–12
 - One staff member per section and one section per staff member
 - Subject-specific access for Classes 11–12
-- Leave requests, admin approval/rejection and in-portal notifications
+- Student and staff dashboards, attendance, notices, achievements and gallery
 - Notices and student achievements
 - Staff gallery submissions with admin approval
 - Admin gallery publishing and website content editor
