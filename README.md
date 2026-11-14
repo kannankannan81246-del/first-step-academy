@@ -28,6 +28,8 @@ This is a static site. Publish the repository root directory with a static hosti
 
 The homepage links to `portal.html` using a relative path. This lets the site move between hosting providers or custom domains without editing the portal URL.
 
+The Netlify preview branch for final pre-launch testing is `prelaunch-finalization-20261113`. The production branch remains `main`.
+
 ## Supabase setup files
 
 For a new, empty Supabase project:
