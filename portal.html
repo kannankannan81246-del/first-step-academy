@@ -378,6 +378,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="adminGallery">Gallery</button>
           <button data-tab="websiteContent">Website Content</button>
           <button data-tab="rfidAttendance">RFID Attendance</button>
+          <button data-tab="feeManagement">Fee Management</button>
         </div>
 
         <!-- ADMISSION -->
@@ -613,6 +614,40 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             <div id="rfidEventList"></div>
           </div>
           <p class="muted">IN / OUT entries are stored in Supabase and shared with the academy admin account. Existing class attendance records are kept separate.</p>
+        </div>
+        <div class="panel hidden" id="feeManagement">
+          <h3>Fee Management</h3>
+          <p class="muted">Admin-only fee structure, student fee accounts, payment entries and payment history.</p>
+          <div class="panel">
+            <h4>Assign Fee to Student</h4>
+            <div class="fields">
+              <div class="field"><label>Student</label><select id="feeStudentSelect"><option value="">Select student</option></select></div>
+              <div class="field"><label>Fee Class</label><select id="feeClassSelect"><option value="">Select fee class</option></select></div>
+              <div class="field"><label>Payment Plan</label><select id="feePayMode"><option>Monthly Pay</option><option>Yearly Pay</option></select></div>
+              <div class="field"><label>Discount (₹)</label><input id="feeDiscount" type="number" min="0" value="0"></div>
+              <div class="field"><label>Next Due Date</label><input id="feeDueDate" type="date"></div>
+            </div>
+            <button class="btn" id="feeAssignBtn">Save / Update Fee Account</button>
+            <div id="feeAccountMessage"></div>
+          </div>
+          <div class="panel">
+            <h4>Record a Payment</h4>
+            <div class="fields">
+              <div class="field"><label>Student Fee Account</label><select id="feePaymentAccount"><option value="">Select account</option></select></div>
+              <div class="field"><label>Payment Date</label><input id="feePaymentDate" type="date"></div>
+              <div class="field"><label>Amount (₹)</label><input id="feePaymentAmount" type="number" min="1"></div>
+              <div class="field"><label>Payment Mode</label><select id="feePaymentMode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div>
+              <div class="field full"><label>Reference / Note</label><input id="feePaymentRef" placeholder="Transaction reference or note"></div>
+            </div>
+            <button class="btn" id="feePaymentSave">Save Payment</button>
+            <div id="feePaymentMessage"></div>
+          </div>
+          <div class="panel">
+            <div class="row"><h4>Fee Accounts</h4><button class="btn secondary" id="feeRefreshBtn">Refresh</button></div>
+            <div id="feeAccountList"></div>
+          </div>
+          <div class="panel"><h4>Payment History</h4><div id="feePaymentList"></div></div>
+          <p class="muted">Fee records are not shown in Staff or Student dashboards. Database access is restricted to authenticated academy admins.</p>
         </div>
         </div>
       </div>
@@ -988,6 +1023,48 @@ async function loadAdmin() {
   }
 }
 
+/* ADMIN-ONLY FEE MANAGEMENT */
+let feeStudents=[], feeClasses=[], feeAccounts=[];
+async function loadFeeManagement() {
+  if (!profile || profile.role !== 'admin') return;
+  const [studentsRes,classesRes,accountsRes,paymentsRes]=await Promise.all([
+    db.from('students').select('id,student_code,full_name,class_name,board_name,active').order('full_name'),
+    db.from('fee_class_rates').select('*').order('class_name'),
+    db.from('student_fee_accounts').select('id,student_id,fee_class_id,pay_mode,discount,due_date,created_at'),
+    db.from('fee_payments').select('id,account_id,receipt_no,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false}).limit(300)
+  ]);
+  const failed=[studentsRes,classesRes,accountsRes,paymentsRes].find(x=>x.error);
+  if(failed){msg('feeAccountMessage',failed.error.message,true);return;}
+  feeStudents=studentsRes.data||[]; feeClasses=classesRes.data||[]; feeAccounts=accountsRes.data||[];
+  $('feeStudentSelect').innerHTML='<option value="">Select student</option>'+feeStudents.filter(s=>s.active).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code)+' · '+esc(s.class_name)+'</option>').join('');
+  $('feeClassSelect').innerHTML='<option value="">Select fee class</option>'+feeClasses.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.class_name)+' · Tuition ₹'+Number(c.tuition_fee).toLocaleString('en-IN')+' + Other ₹'+Number(c.other_fee).toLocaleString('en-IN')+'</option>').join('');
+  $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
+  const accountRows=feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{},cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return [st.student_code||'—',st.full_name||'Student',cl.class_name||'—',a.pay_mode,'₹'+Number(a.discount||0).toLocaleString('en-IN'),a.due_date||'—'];});
+  showTable('feeAccountList',['Code','Student','Fee Class','Plan','Discount','Due Date'],accountRows);
+  const paymentRows=(paymentsRes.data||[]).map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return [p.receipt_no,p.payment_date,st.full_name||'Student','₹'+Number(p.amount).toLocaleString('en-IN'),p.payment_mode,p.reference||'—',p.status];});
+  showTable('feePaymentList',['Receipt','Date','Student','Amount','Mode','Reference','Status'],paymentRows);
+}
+$('feeAssignBtn').onclick=async()=>{
+  if(!profile||profile.role!=='admin')return;
+  const studentId=$('feeStudentSelect').value, feeClassId=$('feeClassSelect').value;
+  const discount=Number($('feeDiscount').value||0), dueDate=$('feeDueDate').value||null;
+  if(!studentId||!feeClassId||discount<0)return msg('feeAccountMessage','Select a student, fee class and valid discount.',true);
+  const {error}=await db.from('student_fee_accounts').upsert({student_id:studentId,fee_class_id:feeClassId,pay_mode:$('feePayMode').value,discount,due_date:dueDate,updated_by:user.id},{onConflict:'student_id'});
+  if(error)return msg('feeAccountMessage',error.message,true);
+  msg('feeAccountMessage','Student fee account saved.'); await loadFeeManagement();
+};
+$('feePaymentSave').onclick=async()=>{
+  if(!profile||profile.role!=='admin')return;
+  const accountId=$('feePaymentAccount').value, amount=Number($('feePaymentAmount').value);
+  if(!accountId||!Number.isFinite(amount)||amount<=0)return msg('feePaymentMessage','Select an account and enter a valid payment amount.',true);
+  const {error}=await db.from('fee_payments').insert({account_id:accountId,payment_date:$('feePaymentDate').value||today,amount,payment_mode:$('feePaymentMode').value,reference:$('feePaymentRef').value.trim(),recorded_by:user.id});
+  if(error)return msg('feePaymentMessage',error.message,true);
+  $('feePaymentAmount').value='';$('feePaymentRef').value='';
+  msg('feePaymentMessage','Payment saved successfully.');await loadFeeManagement();
+};
+$('feeRefreshBtn').onclick=loadFeeManagement;
+$('feePaymentDate').value=today;
+
 /* ADMIN TABS */
 document.querySelectorAll('[data-tab]').forEach(button => {
   button.onclick = () => {
@@ -995,11 +1072,12 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent', 'rfidAttendance']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent', 'rfidAttendance', 'feeManagement']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
     if (button.dataset.tab === 'rfidAttendance') loadRfidPage();
+    if (button.dataset.tab === 'feeManagement') loadFeeManagement();
   };
 });
 
