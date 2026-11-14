@@ -529,5 +529,48 @@ using (
   and (owner_id = (select auth.uid())::text or private.is_academy_admin())
 );
 
+-- RFID attendance: card mappings and IN/OUT events are private to academy admins.
+create table if not exists public.rfid_card_assignments (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null unique references public.students(id) on delete cascade,
+  card_uid text not null unique check (length(trim(card_uid)) > 0),
+  assigned_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists rfid_card_assignments_uid_idx
+  on public.rfid_card_assignments(card_uid);
+
+create table if not exists public.rfid_attendance_events (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete restrict,
+  event_type text not null check (event_type in ('IN','OUT')),
+  method text not null default 'RFID' check (method in ('RFID','Manual')),
+  scanned_by uuid references auth.users(id) on delete set null,
+  scanned_at timestamptz not null default now()
+);
+create index if not exists rfid_attendance_student_time_idx
+  on public.rfid_attendance_events(student_id,scanned_at desc);
+create index if not exists rfid_attendance_time_idx
+  on public.rfid_attendance_events(scanned_at desc);
+
+alter table public.rfid_card_assignments enable row level security;
+alter table public.rfid_attendance_events enable row level security;
+
+drop policy if exists rfid_cards_admin_all on public.rfid_card_assignments;
+create policy rfid_cards_admin_all on public.rfid_card_assignments
+for all to authenticated
+using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists rfid_events_admin_all on public.rfid_attendance_events;
+create policy rfid_events_admin_all on public.rfid_attendance_events
+for all to authenticated
+using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+revoke all on public.rfid_card_assignments,public.rfid_attendance_events from anon;
+grant select,insert,update,delete on public.rfid_card_assignments to authenticated;
+grant select,insert,update,delete on public.rfid_attendance_events to authenticated;
+
 notify pgrst, 'reload schema';
 commit;
