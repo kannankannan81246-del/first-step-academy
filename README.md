@@ -21,6 +21,7 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 - Notices and student achievements
 - Staff gallery submissions with admin approval
 - Admin gallery publishing and website content editor
+- Admin-only fee management: class-wise fee rates, student fee accounts, discounts, due dates, payment receipts and payment history
 
 ## Deployment
 This is a static site. Publish the repository root directory with a static hosting provider. Keep all HTML files and `favicon.svg` in the published root so the relative page links work.
@@ -31,7 +32,7 @@ The homepage links to `portal.html` using a relative path. This lets the site mo
 
 For a new, empty Supabase project:
 1. Apply `supabase-setup.sql` to create the base tables and starter policies.
-2. Apply `supabase/first-step-portal-setup.sql` to add portal features, section/subject attendance, RLS, CMS and gallery. Leave management and its notification workflow are intentionally excluded. RFID attendance uses the additional admin-only tables `rfid_card_assignments` and `rfid_attendance_events` created by this setup script.
+2. Apply `supabase/first-step-portal-setup.sql` to add portal features, section/subject attendance, RLS, CMS and gallery. Leave management and its notification workflow are intentionally excluded. RFID attendance uses the additional admin-only tables `rfid_card_assignments` and `rfid_attendance_events` created by this setup script. Fee management uses the admin-only tables `fee_class_rates`, `student_fee_accounts` and `fee_payments`.
 3. Create Auth users and their matching `profiles` rows. Link student records to their Auth users through `students.auth_user_id`.
 4. Assign staff sections and senior subjects through the admin portal.
 
