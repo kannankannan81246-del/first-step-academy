@@ -377,6 +377,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="adminAchievements">Achievements</button>
           <button data-tab="adminGallery">Gallery</button>
           <button data-tab="websiteContent">Website Content</button>
+          <button data-tab="rfidAttendance">RFID Attendance</button>
         </div>
 
         <!-- ADMISSION -->
@@ -586,6 +587,33 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <div id="websiteContentFields" class="fields"></div>
           <div class="row" style="margin-top:16px"><button class="btn" id="websiteContentSave">Save Website Changes</button><span id="websiteContentStatus" class="muted"></span></div>
           <div id="websiteContentPreview" class="notice hidden"></div>
+        <div class="panel hidden" id="rfidAttendance">
+          <h3>RFID Automatic Attendance</h3>
+          <p class="muted">Admin-only RFID card mapping and IN / OUT records. Connect a USB RFID reader that types the card UID and presses Enter.</p>
+          <div class="panel" style="background:#f7faff">
+            <h4>Scan RFID Card</h4>
+            <div class="fields">
+              <div class="field full"><label>RFID UID / Student Code</label><input id="rfidScanInput" autocomplete="off" placeholder="Scan card here and press Enter"></div>
+            </div>
+            <div class="row"><button class="btn" id="rfidManualBtn">Record Manual Scan</button><button class="btn secondary" id="rfidFocusBtn">Focus Scanner</button><button class="btn secondary" id="rfidRefreshBtn">Refresh Records</button></div>
+            <div id="rfidMessage" class="notice" style="margin-top:12px">Waiting for RFID scan…</div>
+          </div>
+          <div class="panel">
+            <h4>Link RFID Card to Student</h4>
+            <div class="fields">
+              <div class="field"><label>Student</label><select id="rfidStudentSelect"><option value="">Loading students…</option></select></div>
+              <div class="field"><label>RFID UID</label><input id="rfidUidInput" placeholder="Scan card or type UID"></div>
+            </div>
+            <div class="row"><button class="btn" id="rfidSaveCard">Save Card Link</button><button class="btn secondary" id="rfidClearCard">Clear</button></div>
+            <div id="rfidCardList"></div>
+          </div>
+          <div class="panel">
+            <div class="row" style="align-items:center;justify-content:space-between"><h4>Attendance Records</h4><button class="btn secondary" id="rfidExportBtn">Export Attendance CSV</button></div>
+            <div id="rfidStats" class="grid"></div>
+            <div id="rfidEventList"></div>
+          </div>
+          <p class="muted">IN / OUT entries are stored in Supabase and shared with the academy admin account. Existing class attendance records are kept separate.</p>
+        </div>
         </div>
       </div>
 
@@ -967,10 +995,11 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent', 'rfidAttendance']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
+    if (button.dataset.tab === 'rfidAttendance') loadRfidPage();
   };
 });
 
@@ -1378,6 +1407,134 @@ $('achievementSave').onclick=async()=>{
 };
 
 
+
+/* RFID ATTENDANCE — admin-only, Supabase-backed */
+let rfidStudents = [];
+let rfidCards = [];
+let rfidEvents = [];
+let rfidLastScan = '';
+let rfidLastScanAt = 0;
+
+function rfidLocalDayStart() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d.toISOString();
+}
+function rfidDownload(name, rows) {
+  const csv='\\ufeff'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\\r\\n');
+  const a=document.createElement('a');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
+}
+function rfidSetMessage(message, error=false) {
+  const host=$('rfidMessage');
+  host.textContent=message;
+  host.className='notice'+(error?' error':'');
+}
+function rfidFocus() { setTimeout(()=>$('rfidScanInput')?.focus(),80); }
+
+async function loadRfidPage() {
+  if (!profile || profile.role !== 'admin') return;
+  const [studentResult,cardResult,eventResult]=await Promise.all([
+    db.from('students').select('id,student_code,full_name,class_name,active').eq('active',true).order('full_name'),
+    db.from('rfid_card_assignments').select('id,student_id,card_uid,created_at'),
+    db.from('rfid_attendance_events').select('id,student_id,event_type,scanned_at,method').order('scanned_at',{ascending:false}).limit(250)
+  ]);
+  if(studentResult.error||cardResult.error||eventResult.error) {
+    rfidSetMessage('RFID data could not load: '+(studentResult.error||cardResult.error||eventResult.error).message,true);
+    return;
+  }
+  rfidStudents=studentResult.data||[];
+  rfidCards=cardResult.data||[];
+  rfidEvents=eventResult.data||[];
+  $('rfidStudentSelect').innerHTML='<option value="">Select student</option>'+rfidStudents.map(st=>'<option value="'+esc(st.id)+'">'+esc(st.full_name)+' · '+esc(st.student_code||'')+' · '+esc(st.class_name||'')+'</option>').join('');
+  renderRfidPage();
+  rfidFocus();
+}
+function renderRfidPage() {
+  const studentMap=Object.fromEntries(rfidStudents.map(st=>[st.id,st]));
+  $('rfidCardList').innerHTML=rfidCards.length
+    ? '<div class="tableWrap"><table><thead><tr><th>Student</th><th>Class</th><th>RFID UID</th><th>Action</th></tr></thead><tbody>'+rfidCards.map(card=>{
+      const st=studentMap[card.student_id]||{};
+      return '<tr><td>'+esc(st.full_name||'Inactive / unavailable')+'</td><td>'+esc(st.class_name||'—')+'</td><td>'+esc(card.card_uid)+'</td><td><button class="btn secondary" data-rfid-remove="'+esc(card.id)+'">Unlink</button></td></tr>';
+    }).join('')+'</tbody></table></div>'
+    : '<p class="muted">No RFID cards linked yet.</p>';
+  $('rfidCardList').querySelectorAll('[data-rfid-remove]').forEach(button=>button.onclick=async()=>{
+    if(!confirm('Unlink this RFID card? Existing attendance records will remain.')) return;
+    const {error}=await db.from('rfid_card_assignments').delete().eq('id',button.dataset.rfidRemove);
+    if(error) return rfidSetMessage(error.message,true);
+    rfidSetMessage('RFID card unlinked. Past attendance records are unchanged.');
+    await loadRfidPage();
+  });
+
+  const todayEvents=rfidEvents.filter(event=>new Date(event.scanned_at).toDateString()===new Date().toDateString());
+  const presentCount=new Set(todayEvents.filter(event=>event.event_type==='IN').map(event=>event.student_id)).size;
+  const outCount=todayEvents.filter(event=>event.event_type==='OUT').length;
+  $('rfidStats').innerHTML='<div class="stat"><span>Linked RFID cards</span><b>'+rfidCards.length+'</b></div><div class="stat"><span>Today IN</span><b>'+presentCount+'</b></div><div class="stat"><span>Today OUT</span><b>'+outCount+'</b></div>';
+  $('rfidEventList').innerHTML=rfidEvents.length
+    ? '<div class="tableWrap"><table><thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Class</th><th>Status</th><th>Method</th></tr></thead><tbody>'+rfidEvents.map(event=>{
+      const st=studentMap[event.student_id]||{};
+      const dt=new Date(event.scanned_at);
+      return '<tr><td>'+esc(dt.toLocaleDateString('en-IN'))+'</td><td>'+esc(dt.toLocaleTimeString('en-IN'))+'</td><td>'+esc(st.full_name||'Student')+'</td><td>'+esc(st.class_name||'—')+'</td><td>'+esc(event.event_type)+'</td><td>'+esc(event.method)+'</td></tr>';
+    }).join('')+'</tbody></table></div>'
+    : '<p class="muted">No RFID attendance records yet.</p>';
+}
+async function saveRfidCard() {
+  const studentId=$('rfidStudentSelect').value;
+  const uid=$('rfidUidInput').value.trim();
+  if(!studentId||!uid) return rfidSetMessage('Select a student and enter or scan the RFID UID.',true);
+  const {error}=await db.from('rfid_card_assignments').upsert({student_id:studentId,card_uid:uid,assigned_by:user.id},{onConflict:'student_id'});
+  if(error) return rfidSetMessage('Could not save card link: '+error.message,true);
+  $('rfidUidInput').value='';
+  rfidSetMessage('RFID card linked successfully.');
+  await loadRfidPage();
+}
+async function scanRfidAttendance(rawValue,method='RFID') {
+  const raw=String(rawValue||'').trim();
+  if(!raw) return;
+  const now=Date.now();
+  if(raw===rfidLastScan&&now-rfidLastScanAt<4000) {
+    rfidSetMessage('Duplicate scan ignored. Please wait a few seconds.',true);
+    $('rfidScanInput').value='';rfidFocus();return;
+  }
+  rfidLastScan=raw;rfidLastScanAt=now;
+  let studentId=null;
+  if(method==='RFID') {
+    const {data:card,error:cardError}=await db.from('rfid_card_assignments').select('student_id').eq('card_uid',raw).maybeSingle();
+    if(cardError) return rfidSetMessage(cardError.message,true);
+    studentId=card?.student_id||null;
+  }
+  if(!studentId) {
+    const {data:student,error:studentError}=await db.from('students').select('id').eq('student_code',raw).maybeSingle();
+    if(studentError) return rfidSetMessage(studentError.message,true);
+    studentId=student?.id||null;
+  }
+  if(!studentId) {rfidSetMessage('Card / Student ID not found. Link the card to a student first.',true);$('rfidScanInput').value='';rfidFocus();return;}
+  const {data:lastRows,error:lastError}=await db.from('rfid_attendance_events').select('event_type').eq('student_id',studentId).gte('scanned_at',rfidLocalDayStart()).order('scanned_at',{ascending:false}).limit(1);
+  if(lastError) return rfidSetMessage(lastError.message,true);
+  const eventType=(!lastRows?.length||lastRows[0].event_type==='OUT')?'IN':'OUT';
+  const {error:insertError}=await db.from('rfid_attendance_events').insert({student_id:studentId,event_type:eventType,method,scanned_by:user.id});
+  if(insertError) return rfidSetMessage('Attendance was not saved: '+insertError.message,true);
+  const st=rfidStudents.find(item=>item.id===studentId);
+  rfidSetMessage((st?.full_name||'Student')+' — '+eventType+' recorded successfully.');
+  $('rfidScanInput').value='';
+  await loadRfidPage();
+  rfidFocus();
+}
+$('rfidSaveCard').onclick=saveRfidCard;
+$('rfidClearCard').onclick=()=>{$('rfidStudentSelect').value='';$('rfidUidInput').value='';};
+$('rfidScanInput').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();scanRfidAttendance($('rfidScanInput').value,'RFID');}});
+$('rfidUidInput').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('rfidScanInput').value=$('rfidUidInput').value;rfidSetMessage('UID captured. Save the card link to continue.');}});
+$('rfidManualBtn').onclick=()=>scanRfidAttendance($('rfidScanInput').value,'Manual');
+$('rfidFocusBtn').onclick=rfidFocus;
+$('rfidRefreshBtn').onclick=loadRfidPage;
+$('rfidExportBtn').onclick=()=>{
+  const studentMap=Object.fromEntries(rfidStudents.map(st=>[st.id,st]));
+  rfidDownload('rfid_attendance.csv',[['Date','Time','Student ID','Name','Class','Status','Method'],...rfidEvents.map(event=>{
+    const st=studentMap[event.student_id]||{},dt=new Date(event.scanned_at);
+    return [dt.toLocaleDateString('en-IN'),dt.toLocaleTimeString('en-IN'),st.student_code||'',st.full_name||'',st.class_name||'',event.event_type,event.method];
+  })]);
+};
 
 /* WEBSITE CONTENT CMS */
 const WEBSITE_FIELDS = [
