@@ -17,7 +17,7 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 - Subject-based attendance for Classes 9–12
 - One staff member per section and one section per staff member
 - Subject-specific access for Classes 11–12
-- Student and staff dashboards, attendance, notices, achievements and gallery
+- Student and staff dashboards, class attendance, admin-only RFID IN/OUT attendance, notices, achievements and gallery
 - Notices and student achievements
 - Staff gallery submissions with admin approval
 - Admin gallery publishing and website content editor
@@ -31,7 +31,7 @@ The homepage links to `portal.html` using a relative path. This lets the site mo
 
 For a new, empty Supabase project:
 1. Apply `supabase-setup.sql` to create the base tables and starter policies.
-2. Apply `supabase/first-step-portal-setup.sql` to add portal features, section/subject attendance, RLS, CMS and gallery. Leave management and its notification workflow are intentionally excluded.
+2. Apply `supabase/first-step-portal-setup.sql` to add portal features, section/subject attendance, RLS, CMS and gallery. Leave management and its notification workflow are intentionally excluded. RFID attendance uses the additional admin-only tables `rfid_card_assignments` and `rfid_attendance_events` created by this setup script.
 3. Create Auth users and their matching `profiles` rows. Link student records to their Auth users through `students.auth_user_id`.
 4. Assign staff sections and senior subjects through the admin portal.
 
