@@ -647,6 +647,12 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             <div id="feeAccountList"></div>
           </div>
           <div class="panel"><h4>Payment History</h4><div id="feePaymentList"></div></div>
+          <div class="panel">
+            <h4>Sample / Demo Data</h4>
+            <p class="muted"><strong>DEMO ONLY:</strong> These five sample student records and five sample receipts are kept separate from real student accounts and the live payment ledger. They are visible only to admins.</p>
+            <h5>Sample Student Fee Records</h5><div id="feeDemoStudentList"></div>
+            <h5>Sample Payment History</h5><div id="feeDemoPaymentList"></div>
+          </div>
           <p class="muted">Fee records are not shown in Staff or Student dashboards. Database access is restricted to authenticated academy admins.</p>
         </div>
         </div>
@@ -1027,13 +1033,15 @@ async function loadAdmin() {
 let feeStudents=[], feeClasses=[], feeAccounts=[];
 async function loadFeeManagement() {
   if (!profile || profile.role !== 'admin') return;
-  const [studentsRes,classesRes,accountsRes,paymentsRes]=await Promise.all([
+  const [studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes]=await Promise.all([
     db.from('students').select('id,student_code,full_name,class_name,board_name,active').order('full_name'),
     db.from('fee_class_rates').select('*').order('class_name'),
     db.from('student_fee_accounts').select('id,student_id,fee_class_id,pay_mode,discount,due_date,created_at'),
-    db.from('fee_payments').select('id,account_id,receipt_no,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false}).limit(300)
+    db.from('fee_payments').select('id,account_id,receipt_no,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false}).limit(300),
+    db.from('fee_demo_students').select('student_code,display_name,class_name,pay_mode,discount,due_date,reminder_status').order('student_code'),
+    db.from('fee_demo_payments').select('receipt_no,student_code,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false})
   ]);
-  const failed=[studentsRes,classesRes,accountsRes,paymentsRes].find(x=>x.error);
+  const failed=[studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes].find(x=>x.error);
   if(failed){msg('feeAccountMessage',failed.error.message,true);return;}
   feeStudents=studentsRes.data||[]; feeClasses=classesRes.data||[]; feeAccounts=accountsRes.data||[];
   $('feeStudentSelect').innerHTML='<option value="">Select student</option>'+feeStudents.filter(s=>s.active).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code)+' · '+esc(s.class_name)+'</option>').join('');
@@ -1043,6 +1051,16 @@ async function loadFeeManagement() {
   showTable('feeAccountList',['Code','Student','Fee Class','Plan','Discount','Due Date'],accountRows);
   const paymentRows=(paymentsRes.data||[]).map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return [p.receipt_no,p.payment_date,st.full_name||'Student','₹'+Number(p.amount).toLocaleString('en-IN'),p.payment_mode,p.reference||'—',p.status];});
   showTable('feePaymentList',['Receipt','Date','Student','Amount','Mode','Reference','Status'],paymentRows);
+  const demoStudentRows=(demoStudentsRes.data||[]).map(st=>[
+    st.student_code,st.display_name,st.class_name,st.pay_mode,
+    '₹'+Number(st.discount||0).toLocaleString('en-IN'),st.due_date||'—',st.reminder_status||'—'
+  ]);
+  showTable('feeDemoStudentList',['Sample ID','Student','Class','Plan','Discount','Due Date','Reminder Status'],demoStudentRows);
+  const demoPaymentRows=(demoPaymentsRes.data||[]).map(p=>[
+    p.receipt_no,p.payment_date,p.student_code,
+    '₹'+Number(p.amount).toLocaleString('en-IN'),p.payment_mode,p.reference||'—',p.status
+  ]);
+  showTable('feeDemoPaymentList',['Sample Receipt','Date','Sample ID','Amount','Mode','Reference','Status'],demoPaymentRows);
 }
 $('feeAssignBtn').onclick=async()=>{
   if(!profile||profile.role!=='admin')return;
