@@ -1031,7 +1031,20 @@ async function loadAdmin() {
 }
 
 /* ADMIN-ONLY FEE MANAGEMENT */
-let feeStudents=[], feeClasses=[], feeAccounts=[];
+let feeStudents=[], feeClasses=[], feeAccounts=[], feePayments=[];
+function printFeeReceipt(paymentId) {
+  const payment=feePayments.find(p=>p.id===paymentId);
+  if(!payment) return msg('feePaymentMessage','Receipt details could not be found. Refresh and try again.',true);
+  const account=feeAccounts.find(a=>a.id===payment.account_id)||{};
+  const student=feeStudents.find(s=>s.id===account.student_id)||{};
+  const feeClass=feeClasses.find(x=>x.id===account.fee_class_id)||{};
+  const safe=v=>esc(v==null||v===''?'—':v);
+  const w=window.open('','_blank','width=760,height=850');
+  if(!w) return msg('feePaymentMessage','Please allow pop-ups to print the receipt.',true);
+  w.document.write(`<!doctype html><html><head><title>Fee Receipt ${safe(payment.receipt_no)}</title><meta charset="utf-8"><style>
+  body{font-family:Arial,sans-serif;color:#142944;padding:32px}.receipt{max-width:680px;margin:auto;border:2px solid #c5a15b;padding:30px}.top{text-align:center;border-bottom:2px solid #c5a15b;padding-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:7px 0;color:#64748b}.rno{display:flex;justify-content:space-between;margin:22px 0;font-weight:bold}.line{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #e2e8f0;gap:20px}.line span:first-child{color:#64748b}.amount{font-size:21px;font-weight:bold;color:#142944}.foot{text-align:center;margin-top:28px;color:#64748b;font-size:12px}@media print{body{padding:0}.receipt{border:2px solid #c5a15b}}</style></head><body><main class="receipt"><header class="top"><h1>FIRST STEP ACADEMY</h1><p>OFFICIAL FEE PAYMENT RECEIPT</p></header><div class="rno"><span>Receipt No: ${safe(payment.receipt_no)}</span><span>Date: ${safe(payment.payment_date)}</span></div><div class="line"><span>Student Name</span><strong>${safe(student.full_name)}</strong></div><div class="line"><span>Student Code</span><strong>${safe(student.student_code)}</strong></div><div class="line"><span>Class</span><strong>${safe(student.class_name)} ${safe(student.board_name)}</strong></div><div class="line"><span>Fee Category</span><strong>${safe(feeClass.class_name)}</strong></div><div class="line"><span>Payment Mode</span><strong>${safe(payment.payment_mode)}</strong></div><div class="line"><span>Reference / Note</span><strong>${safe(payment.reference)}</strong></div><div class="line"><span>Payment Status</span><strong>${safe(payment.status)}</strong></div><div class="line"><span>Amount Received</span><strong class="amount">₹${Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</strong></div><p class="foot">This is a computer-generated receipt from First Step Academy.</p></main><script>window.onload=()=>window.print();<\/script></body></html>`);
+  w.document.close();
+}
 async function loadFeeManagement() {
   if (!profile || profile.role !== 'admin') return;
   const [studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes]=await Promise.all([
@@ -1044,14 +1057,14 @@ async function loadFeeManagement() {
   ]);
   const failed=[studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes].find(x=>x.error);
   if(failed){msg('feeAccountMessage',failed.error.message,true);return;}
-  feeStudents=studentsRes.data||[]; feeClasses=classesRes.data||[]; feeAccounts=accountsRes.data||[];
+  feeStudents=studentsRes.data||[]; feeClasses=classesRes.data||[]; feeAccounts=accountsRes.data||[]; feePayments=paymentsRes.data||[];
   $('feeStudentSelect').innerHTML='<option value="">Select student</option>'+feeStudents.filter(s=>s.active).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code)+' · '+esc(s.class_name)+'</option>').join('');
   $('feeClassSelect').innerHTML='<option value="">Select fee class</option>'+feeClasses.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.class_name)+' · Tuition ₹'+Number(c.tuition_fee).toLocaleString('en-IN')+' + Other ₹'+Number(c.other_fee).toLocaleString('en-IN')+'</option>').join('');
   $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
   const accountRows=feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{},cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return [st.student_code||'—',st.full_name||'Student',cl.class_name||'—',a.pay_mode,'₹'+Number(a.discount||0).toLocaleString('en-IN'),a.due_date||'—'];});
   showTable('feeAccountList',['Code','Student','Fee Class','Plan','Discount','Due Date'],accountRows);
-  const paymentRows=(paymentsRes.data||[]).map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return [p.receipt_no,p.payment_date,st.full_name||'Student','₹'+Number(p.amount).toLocaleString('en-IN'),p.payment_mode,p.reference||'—',p.status];});
-  showTable('feePaymentList',['Receipt','Date','Student','Amount','Mode','Reference','Status'],paymentRows);
+  $('feePaymentList').innerHTML='<div class="tableWrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th><th>Action</th></tr></thead><tbody>'+feePayments.map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return '<tr><td>'+esc(p.receipt_no)+'</td><td>'+esc(p.payment_date)+'</td><td>'+esc(st.full_name||'Student')+'</td><td>₹'+Number(p.amount).toLocaleString('en-IN')+'</td><td>'+esc(p.payment_mode)+'</td><td>'+esc(p.reference||'—')+'</td><td>'+esc(p.status)+'</td><td><button class="btn secondary" data-print-fee="'+esc(p.id)+'">Print Receipt</button></td></tr>';}).join('')+'</tbody></table></div>';
+  $('feePaymentList').querySelectorAll('[data-print-fee]').forEach(button=>button.onclick=()=>printFeeReceipt(button.dataset.printFee));
   const demoStudentRows=(demoStudentsRes.data||[]).map(st=>[
     st.student_code,st.display_name,st.class_name,st.pay_mode,
     '₹'+Number(st.discount||0).toLocaleString('en-IN'),st.due_date||'—',st.reminder_status||'—'
