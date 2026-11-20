@@ -1032,6 +1032,18 @@ async function loadAdmin() {
 
 /* ADMIN-ONLY FEE MANAGEMENT */
 let feeStudents=[], feeClasses=[], feeAccounts=[], feePayments=[];
+function sendFeeWhatsApp(paymentId) {
+  const payment=feePayments.find(p=>p.id===paymentId);
+  if(!payment) return msg('feePaymentMessage','Payment details could not be found. Refresh and try again.',true);
+  const account=feeAccounts.find(a=>a.id===payment.account_id)||{};
+  const student=feeStudents.find(s=>s.id===account.student_id)||{};
+  let phone=String(student.guardian_phone||'').replace(/\D/g,'');
+  if(phone.startsWith('0')) phone=phone.slice(1);
+  if(phone.length===10) phone='91'+phone;
+  if(phone.length<11||phone.length>15) return msg('feePaymentMessage','Guardian phone number is missing or invalid. Update the student contact number first.',true);
+  const message=['Dear Parent,','','Greetings from First Step Academy!','','We have successfully received the fee payment.','','Student: '+(student.full_name||'—'),'Class: '+(student.class_name||'—')+(student.board_name?' · '+student.board_name:''),'Amount Paid: ₹'+Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2}),'Payment Date: '+payment.payment_date,'Receipt No: '+payment.receipt_no,'Payment Mode: '+payment.payment_mode,'Status: '+payment.status,'','Thank you!','First Step Academy'].join('\n');
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
+}
 function printFeeReceipt(paymentId) {
   const payment=feePayments.find(p=>p.id===paymentId);
   if(!payment) return msg('feePaymentMessage','Receipt details could not be found. Refresh and try again.',true);
@@ -1048,7 +1060,7 @@ function printFeeReceipt(paymentId) {
 async function loadFeeManagement() {
   if (!profile || profile.role !== 'admin') return;
   const [studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes]=await Promise.all([
-    db.from('students').select('id,student_code,full_name,class_name,board_name,active').order('full_name'),
+    db.from('students').select('id,student_code,full_name,class_name,board_name,guardian_phone,active').order('full_name'),
     db.from('fee_class_rates').select('*').order('class_name'),
     db.from('student_fee_accounts').select('id,student_id,fee_class_id,pay_mode,discount,due_date,created_at'),
     db.from('fee_payments').select('id,account_id,receipt_no,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false}).limit(300),
@@ -1063,8 +1075,9 @@ async function loadFeeManagement() {
   $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
   const accountRows=feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{},cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return [st.student_code||'—',st.full_name||'Student',cl.class_name||'—',a.pay_mode,'₹'+Number(a.discount||0).toLocaleString('en-IN'),a.due_date||'—'];});
   showTable('feeAccountList',['Code','Student','Fee Class','Plan','Discount','Due Date'],accountRows);
-  $('feePaymentList').innerHTML='<div class="tableWrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th><th>Action</th></tr></thead><tbody>'+feePayments.map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return '<tr><td>'+esc(p.receipt_no)+'</td><td>'+esc(p.payment_date)+'</td><td>'+esc(st.full_name||'Student')+'</td><td>₹'+Number(p.amount).toLocaleString('en-IN')+'</td><td>'+esc(p.payment_mode)+'</td><td>'+esc(p.reference||'—')+'</td><td>'+esc(p.status)+'</td><td><button class="btn secondary" data-print-fee="'+esc(p.id)+'">Print Receipt</button></td></tr>';}).join('')+'</tbody></table></div>';
+  $('feePaymentList').innerHTML='<div class="tableWrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th><th>Action</th></tr></thead><tbody>'+feePayments.map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return '<tr><td>'+esc(p.receipt_no)+'</td><td>'+esc(p.payment_date)+'</td><td>'+esc(st.full_name||'Student')+'</td><td>₹'+Number(p.amount).toLocaleString('en-IN')+'</td><td>'+esc(p.payment_mode)+'</td><td>'+esc(p.reference||'—')+'</td><td>'+esc(p.status)+'</td><td><button class="btn secondary" data-print-fee="'+esc(p.id)+'">Print Receipt</button> <button class="btn secondary" data-whatsapp-fee="'+esc(p.id)+'">Send WhatsApp</button></td></tr>';}).join('')+'</tbody></table></div>';
   $('feePaymentList').querySelectorAll('[data-print-fee]').forEach(button=>button.onclick=()=>printFeeReceipt(button.dataset.printFee));
+  $('feePaymentList').querySelectorAll('[data-whatsapp-fee]').forEach(button=>button.onclick=()=>sendFeeWhatsApp(button.dataset.whatsappFee));
   const demoStudentRows=(demoStudentsRes.data||[]).map(st=>[
     st.student_code,st.display_name,st.class_name,st.pay_mode,
     '₹'+Number(st.discount||0).toLocaleString('en-IN'),st.due_date||'—',st.reminder_status||'—'
