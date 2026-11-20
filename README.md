@@ -22,6 +22,7 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 - Staff gallery submissions with admin approval
 - Admin gallery publishing and website content editor
 - Admin-only fee management: class-wise fee rates, student fee accounts, discounts, due dates, payment receipts and payment history
+- Separate admin-only sample fee data preview; demo records are isolated from real student accounts and the live payment ledger
 
 ## Deployment
 This is a static site. Publish the repository root directory with a static hosting provider. Keep all HTML files and `favicon.svg` in the published root so the relative page links work.
@@ -42,6 +43,7 @@ For an existing project that already has the portal tables:
 - Use the relevant migration file only after checking which migrations have already been applied.
 - `supabase/cms-gallery-migration.sql` creates the CMS table, gallery table, storage bucket and related policies.
 - `supabase/subject-attendance-migration.sql` adds subject-based attendance and senior roster access to an existing portal setup.
+- `supabase/fee-rfid-admin-migration.sql` safely adds the fee and RFID tables plus isolated admin-only demo fee records to an existing portal project. It does not import sample students into `public.students` or sample payments into the live payment ledger.
 
 The SQL scripts are idempotent where practical, but always take a backup before applying schema or policy changes to a live project.
 
