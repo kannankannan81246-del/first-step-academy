@@ -43,6 +43,33 @@ $fn$;
 revoke all on function private.is_assigned_subject(text) from public,anon;
 grant execute on function private.is_assigned_subject(text) to authenticated;
 
+-- Staff may read senior students only when they are assigned one of that student's subjects.
+drop policy if exists "admin or assigned staff read roster" on public.student_roster;
+create policy "admin or assigned staff read roster" on public.student_roster
+for select to authenticated
+using (
+  private.is_academy_admin()
+  or (
+    active = true
+    and (
+      (
+        section_name is not null
+        and class_name not in ('Class 11','Class 12')
+        and private.is_assigned_to('Section ' || section_name)
+      )
+      or (
+        class_name in ('Class 11','Class 12')
+        and exists (
+          select 1
+          from unnest(coalesce(student_roster.subjects, '{}'::text[])) as student_subject
+          where private.is_assigned_subject(student_subject)
+        )
+      )
+    )
+  )
+);
+
+
 drop policy if exists staff_subject_assignments_admin_manage on public.staff_subject_assignments;
 drop policy if exists staff_subject_assignments_staff_read_own on public.staff_subject_assignments;
 drop policy if exists staff_subject_assignments_read on public.staff_subject_assignments;
@@ -93,11 +120,19 @@ for insert to authenticated with check (
           and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and private.is_assigned_subject(attendance.subject_name))
       )
     )
@@ -120,11 +155,19 @@ with check (
           and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and private.is_assigned_subject(attendance.subject_name))
       )
     )

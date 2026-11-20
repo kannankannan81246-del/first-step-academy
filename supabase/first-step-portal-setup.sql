@@ -70,30 +70,6 @@ create unique index if not exists staff_class_assignments_one_staff_per_section_
   on public.staff_class_assignments(class_name);
 
 -- Portal feature tables.
-create table if not exists public.leave_requests (
-  id uuid primary key default gen_random_uuid(),
-  requester_user_id uuid not null references auth.users(id) on delete cascade,
-  requester_role text not null check (requester_role in ('student','staff')),
-  student_id uuid references public.students(id) on delete set null,
-  start_date date not null,
-  end_date date not null,
-  reason text not null,
-  status text not null default 'Pending' check (status in ('Pending','Approved','Rejected')),
-  admin_note text,
-  reviewed_by uuid references auth.users(id) on delete set null,
-  reviewed_at timestamptz,
-  created_at timestamptz not null default now(),
-  constraint leave_dates_valid check (end_date >= start_date),
-  constraint student_request_has_student check (
-    (requester_role = 'student' and student_id is not null) or
-    (requester_role = 'staff' and student_id is null)
-  )
-);
-create index if not exists leave_requests_requester_idx on public.leave_requests(requester_user_id,created_at desc);
-create index if not exists leave_requests_status_idx on public.leave_requests(status,created_at desc);
-create index if not exists leave_requests_student_id_idx on public.leave_requests(student_id);
-create index if not exists leave_requests_reviewed_by_idx on public.leave_requests(reviewed_by);
-
 create table if not exists public.academy_notices (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -121,24 +97,11 @@ create index if not exists student_achievements_date_idx on public.student_achie
 create index if not exists student_achievements_student_id_idx on public.student_achievements(student_id);
 create index if not exists student_achievements_created_by_idx on public.student_achievements(created_by);
 
-create table if not exists public.portal_notifications (
-  id uuid primary key default gen_random_uuid(),
-  recipient_user_id uuid not null references auth.users(id) on delete cascade,
-  title text not null,
-  message text not null,
-  related_leave_id uuid references public.leave_requests(id) on delete set null,
-  is_read boolean not null default false,
-  created_at timestamptz not null default now()
-);
-create index if not exists portal_notifications_recipient_created_idx on public.portal_notifications(recipient_user_id,created_at desc);
-create index if not exists portal_notifications_related_leave_id_idx on public.portal_notifications(related_leave_id);
 create index if not exists attendance_marked_by_idx on public.attendance(marked_by);
 create index if not exists staff_attendance_marked_by_idx on public.staff_attendance(marked_by);
 
-alter table public.leave_requests enable row level security;
 alter table public.academy_notices enable row level security;
 alter table public.student_achievements enable row level security;
-alter table public.portal_notifications enable row level security;
 
 -- Keep SECURITY DEFINER authorization helpers outside the exposed public API schema.
 create schema if not exists private;
@@ -214,33 +177,6 @@ for select to authenticated using (auth_user_id=(select auth.uid()));
 revoke all on function public.is_academy_admin() from public,anon,authenticated;
 revoke all on function public.is_assigned_to(text) from public,anon,authenticated;
 
--- Leave requests: requester reads own, admin reviews; only linked students/staff can submit.
-drop policy if exists leave_select_own_or_admin on public.leave_requests;
-create policy leave_select_own_or_admin on public.leave_requests
-for select to authenticated
-using (requester_user_id = (select auth.uid()) or private.is_academy_admin());
-
-drop policy if exists leave_insert_own on public.leave_requests;
-create policy leave_insert_own on public.leave_requests
-for insert to authenticated
-with check (
-  requester_user_id = (select auth.uid())
-  and status = 'Pending' and reviewed_by is null
-  and exists (select 1 from public.profiles p where p.id=(select auth.uid()) and p.role=requester_role and p.role in ('student','staff'))
-  and (
-    (requester_role='staff' and student_id is null)
-    or (requester_role='student' and exists (
-      select 1 from public.students s where s.id=student_id and s.auth_user_id=(select auth.uid())
-    ))
-  )
-);
-
-drop policy if exists leave_admin_review on public.leave_requests;
-create policy leave_admin_review on public.leave_requests
-for update to authenticated using (private.is_academy_admin())
-with check (private.is_academy_admin());
-
--- Notices: published audience-specific reading, admin-only management.
 drop policy if exists notices_read_for_audience on public.academy_notices;
 create policy notices_read_for_audience on public.academy_notices
 for select to authenticated
@@ -277,43 +213,7 @@ drop policy if exists achievements_admin_delete on public.student_achievements;
 create policy achievements_admin_delete on public.student_achievements
 for delete to authenticated using (private.is_academy_admin());
 
--- Notifications are created only by the database trigger; users may only mark their own as read.
-drop policy if exists notifications_read_own_or_admin on public.portal_notifications;
-create policy notifications_read_own_or_admin on public.portal_notifications
-for select to authenticated using (recipient_user_id=(select auth.uid()) or private.is_academy_admin());
-drop policy if exists notifications_update_own_read_status on public.portal_notifications;
-create policy notifications_update_own_read_status on public.portal_notifications
-for update to authenticated using (recipient_user_id=(select auth.uid()))
-with check (recipient_user_id=(select auth.uid()));
 
-revoke all on public.leave_requests,public.academy_notices,public.student_achievements,public.portal_notifications from anon;
-grant select,insert,update on public.leave_requests to authenticated;
-grant select,insert,update,delete on public.academy_notices to authenticated;
-grant select,insert,update,delete on public.student_achievements to authenticated;
-grant select on public.portal_notifications to authenticated;
-revoke insert,update,delete on public.portal_notifications from authenticated;
-grant update (is_read) on public.portal_notifications to authenticated;
-grant select (id,title,description,achievement_date) on public.student_achievements to anon;
-
-create or replace function public.notify_leave_decision()
-returns trigger language plpgsql security definer set search_path=public
-as $fn$
-declare decision_text text; details text;
-begin
-  if old.status='Pending' and new.status in ('Approved','Rejected') then
-    decision_text := case when new.status='Approved' then 'approved' else 'not approved' end;
-    details := 'Your leave request ('||new.start_date::text||' to '||new.end_date::text||') has been '||decision_text||
-      case when new.admin_note is not null and length(trim(new.admin_note))>0 then ' Admin note: '||new.admin_note else '' end;
-    insert into public.portal_notifications(recipient_user_id,title,message,related_leave_id)
-    values(new.requester_user_id,'Leave request '||new.status,details,new.id);
-  end if;
-  return new;
-end;
-$fn$;
-revoke all on function public.notify_leave_decision() from public,anon,authenticated;
-drop trigger if exists leave_decision_notification on public.leave_requests;
-create trigger leave_decision_notification after update of status on public.leave_requests
-for each row execute function public.notify_leave_decision();
 
 
 -- Section-aware roster access and attendance submission.
@@ -379,6 +279,33 @@ $fn$;
 revoke all on function private.is_assigned_subject(text) from public,anon;
 grant execute on function private.is_assigned_subject(text) to authenticated;
 
+-- Staff may read senior students only when they are assigned one of that student's subjects.
+drop policy if exists "admin or assigned staff read roster" on public.student_roster;
+create policy "admin or assigned staff read roster" on public.student_roster
+for select to authenticated
+using (
+  private.is_academy_admin()
+  or (
+    active = true
+    and (
+      (
+        section_name is not null
+        and class_name not in ('Class 11','Class 12')
+        and private.is_assigned_to('Section ' || section_name)
+      )
+      or (
+        class_name in ('Class 11','Class 12')
+        and exists (
+          select 1
+          from unnest(coalesce(student_roster.subjects, '{}'::text[])) as student_subject
+          where private.is_assigned_subject(student_subject)
+        )
+      )
+    )
+  )
+);
+
+
 drop policy if exists staff_subject_assignments_admin_manage on public.staff_subject_assignments;
 drop policy if exists staff_subject_assignments_staff_read_own on public.staff_subject_assignments;
 drop policy if exists staff_subject_assignments_read on public.staff_subject_assignments;
@@ -429,11 +356,19 @@ for insert to authenticated with check (
           and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and private.is_assigned_subject(attendance.subject_name))
       )
     )
@@ -456,11 +391,19 @@ with check (
           and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 9','Class 10') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and r.section_name is not null and private.is_assigned_to('Section '||r.section_name))
         or
         (r.class_name in ('Class 11','Class 12') and attendance.subject_name<>''
-          and attendance.subject_name=any(coalesce(r.subjects,'{}'::text[]))
+          and exists (
+            select 1
+            from unnest(coalesce(r.subjects,'{}'::text[])) as assigned_student_subject(subject_name)
+            where lower(assigned_student_subject.subject_name)=lower(attendance.subject_name)
+          )
           and private.is_assigned_subject(attendance.subject_name))
       )
     )
@@ -473,5 +416,240 @@ grant select,insert,update,delete on public.attendance to authenticated;
 
 
 -- The public achievements page never receives student names or identifying details.
+create table if not exists public.website_content (
+  content_key text primary key,
+  content_value text not null default '',
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists website_content_updated_by_idx
+  on public.website_content(updated_by);
+
+alter table public.website_content enable row level security;
+grant select on public.website_content to anon, authenticated;
+grant insert, update, delete on public.website_content to authenticated;
+
+drop policy if exists "public can read website content" on public.website_content;
+create policy "public can read website content" on public.website_content
+for select to anon, authenticated using (true);
+
+drop policy if exists "admin manage website content" on public.website_content;
+create policy "admin manage website content" on public.website_content
+for all to authenticated
+using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+create table if not exists public.gallery_photos (
+  id uuid primary key default gen_random_uuid(),
+  caption text not null default '',
+  category text not null default 'Academy Activities',
+  image_path text not null unique,
+  published boolean not null default false,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists gallery_photos_created_by_idx
+  on public.gallery_photos(created_by);
+
+alter table public.gallery_photos enable row level security;
+grant select on public.gallery_photos to anon, authenticated;
+grant insert, update, delete on public.gallery_photos to authenticated;
+
+drop policy if exists "gallery photos public read published" on public.gallery_photos;
+create policy "gallery photos public read published" on public.gallery_photos
+for select to anon, authenticated using (published = true);
+
+drop policy if exists "gallery photos admin read all" on public.gallery_photos;
+create policy "gallery photos admin read all" on public.gallery_photos
+for select to authenticated using (private.is_academy_admin());
+
+drop policy if exists "gallery photos staff read own" on public.gallery_photos;
+create policy "gallery photos staff read own" on public.gallery_photos
+for select to authenticated using (created_by = (select auth.uid()));
+
+drop policy if exists "gallery photos staff admin insert" on public.gallery_photos;
+create policy "gallery photos staff admin insert" on public.gallery_photos
+for insert to authenticated
+with check (
+  created_by = (select auth.uid())
+  and exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.role in ('admin','staff')
+  )
+  and (published = false or private.is_academy_admin())
+);
+
+drop policy if exists "gallery photos admin update" on public.gallery_photos;
+create policy "gallery photos admin update" on public.gallery_photos
+for update to authenticated
+using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists "gallery photos owner or admin delete" on public.gallery_photos;
+create policy "gallery photos owner or admin delete" on public.gallery_photos
+for delete to authenticated
+using (created_by = (select auth.uid()) or private.is_academy_admin());
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'academy-gallery',
+  'academy-gallery',
+  true,
+  8388608,
+  array['image/jpeg','image/png','image/webp']::text[]
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "gallery images public read" on storage.objects;
+create policy "gallery images public read" on storage.objects
+for select to anon, authenticated
+using (bucket_id = 'academy-gallery');
+
+drop policy if exists "gallery images staff admin upload" on storage.objects;
+create policy "gallery images staff admin upload" on storage.objects
+for insert to authenticated
+with check (
+  bucket_id = 'academy-gallery'
+  and exists (
+    select 1 from public.profiles p
+    where p.id = (select auth.uid()) and p.role in ('admin','staff')
+  )
+);
+
+drop policy if exists "gallery images owner or admin delete" on storage.objects;
+create policy "gallery images owner or admin delete" on storage.objects
+for delete to authenticated
+using (
+  bucket_id = 'academy-gallery'
+  and (owner_id = (select auth.uid())::text or private.is_academy_admin())
+);
+
+-- RFID attendance: card mappings and IN/OUT events are private to academy admins.
+create table if not exists public.rfid_card_assignments (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null unique references public.students(id) on delete cascade,
+  card_uid text not null unique check (length(trim(card_uid)) > 0),
+  assigned_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists rfid_card_assignments_uid_idx
+  on public.rfid_card_assignments(card_uid);
+
+create table if not exists public.rfid_attendance_events (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.students(id) on delete restrict,
+  event_type text not null check (event_type in ('IN','OUT')),
+  method text not null default 'RFID' check (method in ('RFID','Manual')),
+  scanned_by uuid references auth.users(id) on delete set null,
+  scanned_at timestamptz not null default now()
+);
+create index if not exists rfid_attendance_student_time_idx
+  on public.rfid_attendance_events(student_id,scanned_at desc);
+create index if not exists rfid_attendance_time_idx
+  on public.rfid_attendance_events(scanned_at desc);
+
+alter table public.rfid_card_assignments enable row level security;
+alter table public.rfid_attendance_events enable row level security;
+
+drop policy if exists rfid_cards_admin_all on public.rfid_card_assignments;
+create policy rfid_cards_admin_all on public.rfid_card_assignments
+for all to authenticated
+using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+drop policy if exists rfid_events_admin_all on public.rfid_attendance_events;
+create policy rfid_events_admin_all on public.rfid_attendance_events
+for all to authenticated
+using (private.is_academy_admin())
+with check (private.is_academy_admin());
+
+revoke all on public.rfid_card_assignments,public.rfid_attendance_events from anon;
+grant select,insert,update,delete on public.rfid_card_assignments to authenticated;
+grant select,insert,update,delete on public.rfid_attendance_events to authenticated;
+
+
+-- Fee management: fee rates, student fee accounts and payment ledger.
+-- All fee data is restricted to authenticated academy admins.
+create table if not exists public.fee_class_rates (
+  id uuid primary key default gen_random_uuid(),
+  class_name text not null unique,
+  tuition_fee numeric(12,2) not null default 0 check (tuition_fee >= 0),
+  other_fee numeric(12,2) not null default 0 check (other_fee >= 0),
+  default_pay_mode text not null default 'Monthly Pay'
+    check (default_pay_mode in ('Monthly Pay','Yearly Pay')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into public.fee_class_rates(class_name,tuition_fee,other_fee,default_pay_mode) values
+('III CBSE',10000,2000,'Monthly Pay'),
+('IV CBSE',11000,2000,'Monthly Pay'),
+('V CBSE',12000,2500,'Monthly Pay'),
+('VI CBSE',13000,2500,'Monthly Pay'),
+('VII CBSE',14000,3000,'Yearly Pay'),
+('VIII CBSE',15000,3000,'Yearly Pay'),
+('IX CBSE',16000,3500,'Yearly Pay'),
+('III M.ST',9000,1500,'Monthly Pay'),
+('IV M.ST',10000,1500,'Monthly Pay'),
+('V M.ST',11000,2000,'Monthly Pay'),
+('VI M.ST',12000,2000,'Monthly Pay'),
+('VII M.ST',13000,2500,'Yearly Pay'),
+('VIII M.ST',14000,2500,'Yearly Pay'),
+('IX M.ST',15000,3000,'Yearly Pay')
+on conflict(class_name) do update set
+ tuition_fee=excluded.tuition_fee,
+ other_fee=excluded.other_fee,
+ default_pay_mode=excluded.default_pay_mode,
+ updated_at=now();
+
+create table if not exists public.student_fee_accounts (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null unique references public.students(id) on delete restrict,
+  fee_class_id uuid not null references public.fee_class_rates(id) on delete restrict,
+  pay_mode text not null check(pay_mode in ('Monthly Pay','Yearly Pay')),
+  discount numeric(12,2) not null default 0 check(discount >= 0),
+  due_date date,
+  updated_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists student_fee_accounts_class_idx on public.student_fee_accounts(fee_class_id);
+
+create table if not exists public.fee_payments (
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.student_fee_accounts(id) on delete restrict,
+  receipt_no text not null unique default ('FSA-' || upper(substr(replace(gen_random_uuid()::text,'-',''),1,10))),
+  payment_date date not null default current_date,
+  amount numeric(12,2) not null check(amount > 0),
+  payment_mode text not null check(payment_mode in ('Cash','UPI','Bank Transfer','Card','Other')),
+  reference text not null default '',
+  status text not null default 'Cleared' check(status in ('Cleared','Pending','Reversed')),
+  recorded_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists fee_payments_account_date_idx on public.fee_payments(account_id,payment_date desc);
+
+alter table public.fee_class_rates enable row level security;
+alter table public.student_fee_accounts enable row level security;
+alter table public.fee_payments enable row level security;
+
+drop policy if exists fee_class_rates_admin_only on public.fee_class_rates;
+create policy fee_class_rates_admin_only on public.fee_class_rates
+for all to authenticated using(private.is_academy_admin()) with check(private.is_academy_admin());
+drop policy if exists student_fee_accounts_admin_only on public.student_fee_accounts;
+create policy student_fee_accounts_admin_only on public.student_fee_accounts
+for all to authenticated using(private.is_academy_admin()) with check(private.is_academy_admin());
+drop policy if exists fee_payments_admin_only on public.fee_payments;
+create policy fee_payments_admin_only on public.fee_payments
+for all to authenticated using(private.is_academy_admin()) with check(private.is_academy_admin());
+
+revoke all on public.fee_class_rates,public.student_fee_accounts,public.fee_payments from anon;
+grant select,insert,update,delete on public.fee_class_rates,public.student_fee_accounts,public.fee_payments to authenticated;
+
 notify pgrst, 'reload schema';
 commit;

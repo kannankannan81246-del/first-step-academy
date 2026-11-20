@@ -306,6 +306,8 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 }
 
 </style>
+<meta name="theme-color" content="#102541">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
 
 <body>
@@ -371,11 +373,12 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="staffAttendance">Staff Attendance</button>
           <button data-tab="studentsList">Students</button>
           <button data-tab="assignments">Class Assignments</button>
-          <button data-tab="adminLeaves">Leave Requests</button>
           <button data-tab="adminNotices">Notices</button>
           <button data-tab="adminAchievements">Achievements</button>
           <button data-tab="adminGallery">Gallery</button>
           <button data-tab="websiteContent">Website Content</button>
+          <button data-tab="rfidAttendance">RFID Attendance</button>
+          <button data-tab="feeManagement">Fee Management</button>
         </div>
 
         <!-- ADMISSION -->
@@ -546,12 +549,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
         </div>
 
-        <div class="panel hidden" id="adminLeaves">
-          <h3>Leave Requests</h3>
-          <p class="muted">Review student and staff leave requests.</p>
-          <div id="adminLeaveList"></div>
-        </div>
-
         <div class="panel hidden" id="adminNotices">
           <h3>Publish a Notice</h3>
           <div class="fields">
@@ -592,6 +589,74 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <div class="row" style="margin-top:16px"><button class="btn" id="websiteContentSave">Save Website Changes</button><span id="websiteContentStatus" class="muted"></span></div>
           <div id="websiteContentPreview" class="notice hidden"></div>
         </div>
+        <div class="panel hidden" id="rfidAttendance">
+          <h3>RFID Automatic Attendance</h3>
+          <p class="muted">Admin-only RFID card mapping and IN / OUT records. Connect a USB RFID reader that types the card UID and presses Enter.</p>
+          <div class="panel" style="background:#f7faff">
+            <h4>Scan RFID Card</h4>
+            <div class="fields">
+              <div class="field full"><label>RFID UID / Student Code</label><input id="rfidScanInput" autocomplete="off" placeholder="Scan card here and press Enter"></div>
+            </div>
+            <div class="row"><button class="btn" id="rfidManualBtn">Record Manual Scan</button><button class="btn secondary" id="rfidFocusBtn">Focus Scanner</button><button class="btn secondary" id="rfidRefreshBtn">Refresh Records</button></div>
+            <div id="rfidMessage" class="notice" style="margin-top:12px">Waiting for RFID scan…</div>
+          </div>
+          <div class="panel">
+            <h4>Link RFID Card to Student</h4>
+            <div class="fields">
+              <div class="field"><label>Student</label><select id="rfidStudentSelect"><option value="">Loading students…</option></select></div>
+              <div class="field"><label>RFID UID</label><input id="rfidUidInput" placeholder="Scan card or type UID"></div>
+            </div>
+            <div class="row"><button class="btn" id="rfidSaveCard">Save Card Link</button><button class="btn secondary" id="rfidClearCard">Clear</button></div>
+            <div id="rfidCardList"></div>
+          </div>
+          <div class="panel">
+            <div class="row" style="align-items:center;justify-content:space-between"><h4>Attendance Records</h4><button class="btn secondary" id="rfidExportBtn">Export Attendance CSV</button></div>
+            <div id="rfidStats" class="grid"></div>
+            <div id="rfidEventList"></div>
+          </div>
+          <p class="muted">IN / OUT entries are stored in Supabase and shared with the academy admin account. Existing class attendance records are kept separate.</p>
+        </div>
+        <div class="panel hidden" id="feeManagement">
+          <h3>Fee Management</h3>
+          <p class="muted">Admin-only fee structure, student fee accounts, payment entries and payment history.</p>
+          <div class="panel">
+            <h4>Assign Fee to Student</h4>
+            <div class="fields">
+              <div class="field"><label>Student</label><select id="feeStudentSelect"><option value="">Select student</option></select></div>
+              <div class="field"><label>Fee Class</label><select id="feeClassSelect"><option value="">Select fee class</option></select></div>
+              <div class="field"><label>Payment Plan</label><select id="feePayMode"><option>Monthly Pay</option><option>Yearly Pay</option></select></div>
+              <div class="field"><label>Discount (₹)</label><input id="feeDiscount" type="number" min="0" value="0"></div>
+              <div class="field"><label>Next Due Date</label><input id="feeDueDate" type="date"></div>
+            </div>
+            <button class="btn" id="feeAssignBtn">Save / Update Fee Account</button>
+            <div id="feeAccountMessage"></div>
+          </div>
+          <div class="panel">
+            <h4>Record a Payment</h4>
+            <div class="fields">
+              <div class="field"><label>Student Fee Account</label><select id="feePaymentAccount"><option value="">Select account</option></select></div>
+              <div class="field"><label>Payment Date</label><input id="feePaymentDate" type="date"></div>
+              <div class="field"><label>Amount (₹)</label><input id="feePaymentAmount" type="number" min="1"></div>
+              <div class="field"><label>Payment Mode</label><select id="feePaymentMode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select></div>
+              <div class="field full"><label>Reference / Note</label><input id="feePaymentRef" placeholder="Transaction reference or note"></div>
+            </div>
+            <button class="btn" id="feePaymentSave">Save Payment</button>
+            <div id="feePaymentMessage"></div>
+          </div>
+          <div class="panel">
+            <div class="row"><h4>Fee Accounts</h4><button class="btn secondary" id="feeRefreshBtn">Refresh</button></div>
+            <div id="feeAccountList"></div>
+          </div>
+          <div class="panel"><h4>Payment History</h4><div id="feePaymentList"></div></div>
+          <div class="panel">
+            <h4>Sample / Demo Data</h4>
+            <p class="muted"><strong>DEMO ONLY:</strong> These five sample student records and five sample receipts are kept separate from real student accounts and the live payment ledger. They are visible only to admins.</p>
+            <h5>Sample Student Fee Records</h5><div id="feeDemoStudentList"></div>
+            <h5>Sample Payment History</h5><div id="feeDemoPaymentList"></div>
+          </div>
+          <p class="muted">Fee records are not shown in Staff or Student dashboards. Database access is restricted to authenticated academy admins.</p>
+        </div>
+        </div>
       </div>
 
       <!-- STAFF DASHBOARD -->
@@ -625,16 +690,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="saveRoster">Save Student Attendance</button>
         </div>
         <div class="panel">
-          <h3>Request Leave</h3>
-          <div class="fields">
-            <div class="field"><label>From Date</label><input id="staffLeaveStart" type="date"></div>
-            <div class="field"><label>To Date</label><input id="staffLeaveEnd" type="date"></div>
-            <div class="field full"><label>Reason</label><textarea id="staffLeaveReason" rows="3"></textarea></div>
-          </div>
-          <button class="btn" id="staffLeaveSubmit">Submit Leave Request</button>
-          <div id="staffLeaveHistory"></div>
-        </div>
-        <div class="panel">
           <h3>Upload Gallery Photo</h3>
           <p class="muted">Your photo will be sent to the admin for approval before appearing publicly.</p>
           <div class="fields">
@@ -645,7 +700,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="staffGalleryUpload">Submit Photo for Approval</button>
           <div id="staffGalleryList"></div>
         </div>
-        <div class="panel"><h3>My Notifications</h3><div id="staffNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="staffNotices"></div></div>
       </div>
 
@@ -662,17 +716,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         </div>
 
         <div class="panel"><h3>My Attendance History</h3><div id="myAttendance"></div></div>
-        <div class="panel">
-          <h3>Request Leave</h3>
-          <div class="fields">
-            <div class="field"><label>From Date</label><input id="studentLeaveStart" type="date"></div>
-            <div class="field"><label>To Date</label><input id="studentLeaveEnd" type="date"></div>
-            <div class="field full"><label>Reason</label><textarea id="studentLeaveReason" rows="3"></textarea></div>
-          </div>
-          <button class="btn" id="studentLeaveSubmit">Submit Leave Request</button>
-          <div id="studentLeaveHistory"></div>
-        </div>
-        <div class="panel"><h3>My Notifications</h3><div id="studentNotifications"></div></div>
         <div class="panel"><h3>Academy Notices</h3><div id="studentNotices"></div></div>
         <div class="panel"><h3>My Achievements</h3><div id="studentAchievements"></div></div>
       </div>
@@ -725,7 +768,7 @@ $('adBoard').addEventListener('change', updateAdmissionSection);
 
 
 
-['adDate', 'staffDate', 'classDate', 'achievementDate', 'staffLeaveStart', 'staffLeaveEnd', 'studentLeaveStart', 'studentLeaveEnd'].forEach(id => {
+['adDate', 'staffDate', 'classDate', 'achievementDate'].forEach(id => {
   $(id).value = today;
 });
 
@@ -844,12 +887,10 @@ async function loadDashboard() {
     $('staffDash').classList.remove('hidden');
     await loadStaff();
     await loadRoleNotices('staff');
-    await loadNotifications();
   } else if (data.role === 'student') {
     $('studentDash').classList.remove('hidden');
     await loadStudent();
     await loadRoleNotices('student');
-    await loadNotifications();
   } else {
     msg('dashMsg', 'Unknown account role.', true);
   }
@@ -989,6 +1030,86 @@ async function loadAdmin() {
   }
 }
 
+/* ADMIN-ONLY FEE MANAGEMENT */
+let feeStudents=[], feeClasses=[], feeAccounts=[], feePayments=[];
+function sendFeeWhatsApp(paymentId) {
+  const payment=feePayments.find(p=>p.id===paymentId);
+  if(!payment) return msg('feePaymentMessage','Payment details could not be found. Refresh and try again.',true);
+  const account=feeAccounts.find(a=>a.id===payment.account_id)||{};
+  const student=feeStudents.find(s=>s.id===account.student_id)||{};
+  let phone=String(student.guardian_phone||'').replace(/\D/g,'');
+  if(phone.startsWith('0')) phone=phone.slice(1);
+  if(phone.length===10) phone='91'+phone;
+  if(phone.length<11||phone.length>15) return msg('feePaymentMessage','Guardian phone number is missing or invalid. Update the student contact number first.',true);
+  const message=['Dear Parent,','','Greetings from First Step Academy!','','We have successfully received the fee payment.','','Student: '+(student.full_name||'—'),'Class: '+(student.class_name||'—')+(student.board_name?' · '+student.board_name:''),'Amount Paid: ₹'+Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2}),'Payment Date: '+payment.payment_date,'Receipt No: '+payment.receipt_no,'Payment Mode: '+payment.payment_mode,'Status: '+payment.status,'','Thank you!','First Step Academy'].join('\n');
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank','noopener');
+}
+function printFeeReceipt(paymentId) {
+  const payment=feePayments.find(p=>p.id===paymentId);
+  if(!payment) return msg('feePaymentMessage','Receipt details could not be found. Refresh and try again.',true);
+  const account=feeAccounts.find(a=>a.id===payment.account_id)||{};
+  const student=feeStudents.find(s=>s.id===account.student_id)||{};
+  const feeClass=feeClasses.find(x=>x.id===account.fee_class_id)||{};
+  const safe=v=>esc(v==null||v===''?'—':v);
+  const w=window.open('','_blank','width=760,height=850');
+  if(!w) return msg('feePaymentMessage','Please allow pop-ups to print the receipt.',true);
+  w.document.write(`<!doctype html><html><head><title>Fee Receipt ${safe(payment.receipt_no)}</title><meta charset="utf-8"><style>
+  body{font-family:Arial,sans-serif;color:#142944;padding:32px}.receipt{max-width:680px;margin:auto;border:2px solid #c5a15b;padding:30px}.top{text-align:center;border-bottom:2px solid #c5a15b;padding-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:7px 0;color:#64748b}.rno{display:flex;justify-content:space-between;margin:22px 0;font-weight:bold}.line{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #e2e8f0;gap:20px}.line span:first-child{color:#64748b}.amount{font-size:21px;font-weight:bold;color:#142944}.foot{text-align:center;margin-top:28px;color:#64748b;font-size:12px}@media print{body{padding:0}.receipt{border:2px solid #c5a15b}}</style></head><body><main class="receipt"><header class="top"><h1>FIRST STEP ACADEMY</h1><p>OFFICIAL FEE PAYMENT RECEIPT</p></header><div class="rno"><span>Receipt No: ${safe(payment.receipt_no)}</span><span>Date: ${safe(payment.payment_date)}</span></div><div class="line"><span>Student Name</span><strong>${safe(student.full_name)}</strong></div><div class="line"><span>Student Code</span><strong>${safe(student.student_code)}</strong></div><div class="line"><span>Class</span><strong>${safe(student.class_name)} ${safe(student.board_name)}</strong></div><div class="line"><span>Fee Category</span><strong>${safe(feeClass.class_name)}</strong></div><div class="line"><span>Payment Mode</span><strong>${safe(payment.payment_mode)}</strong></div><div class="line"><span>Reference / Note</span><strong>${safe(payment.reference)}</strong></div><div class="line"><span>Payment Status</span><strong>${safe(payment.status)}</strong></div><div class="line"><span>Amount Received</span><strong class="amount">₹${Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</strong></div><p class="foot">This is a computer-generated receipt from First Step Academy.</p></main><script>window.onload=()=>window.print();<\/script></body></html>`);
+  w.document.close();
+}
+async function loadFeeManagement() {
+  if (!profile || profile.role !== 'admin') return;
+  const [studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes]=await Promise.all([
+    db.from('students').select('id,student_code,full_name,class_name,board_name,guardian_phone,active').order('full_name'),
+    db.from('fee_class_rates').select('*').order('class_name'),
+    db.from('student_fee_accounts').select('id,student_id,fee_class_id,pay_mode,discount,due_date,created_at'),
+    db.from('fee_payments').select('id,account_id,receipt_no,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false}).limit(300),
+    db.from('fee_demo_students').select('student_code,display_name,class_name,pay_mode,discount,due_date,reminder_status').order('student_code'),
+    db.from('fee_demo_payments').select('receipt_no,student_code,payment_date,amount,payment_mode,reference,status').order('payment_date',{ascending:false})
+  ]);
+  const failed=[studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes].find(x=>x.error);
+  if(failed){msg('feeAccountMessage',failed.error.message,true);return;}
+  feeStudents=studentsRes.data||[]; feeClasses=classesRes.data||[]; feeAccounts=accountsRes.data||[]; feePayments=paymentsRes.data||[];
+  $('feeStudentSelect').innerHTML='<option value="">Select student</option>'+feeStudents.filter(s=>s.active).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code)+' · '+esc(s.class_name)+'</option>').join('');
+  $('feeClassSelect').innerHTML='<option value="">Select fee class</option>'+feeClasses.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.class_name)+' · Tuition ₹'+Number(c.tuition_fee).toLocaleString('en-IN')+' + Other ₹'+Number(c.other_fee).toLocaleString('en-IN')+'</option>').join('');
+  $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
+  const accountRows=feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{},cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return [st.student_code||'—',st.full_name||'Student',cl.class_name||'—',a.pay_mode,'₹'+Number(a.discount||0).toLocaleString('en-IN'),a.due_date||'—'];});
+  showTable('feeAccountList',['Code','Student','Fee Class','Plan','Discount','Due Date'],accountRows);
+  $('feePaymentList').innerHTML='<div class="tableWrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th><th>Action</th></tr></thead><tbody>'+feePayments.map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return '<tr><td>'+esc(p.receipt_no)+'</td><td>'+esc(p.payment_date)+'</td><td>'+esc(st.full_name||'Student')+'</td><td>₹'+Number(p.amount).toLocaleString('en-IN')+'</td><td>'+esc(p.payment_mode)+'</td><td>'+esc(p.reference||'—')+'</td><td>'+esc(p.status)+'</td><td><button class="btn secondary" data-print-fee="'+esc(p.id)+'">Print Receipt</button> <button class="btn secondary" data-whatsapp-fee="'+esc(p.id)+'">Send WhatsApp</button></td></tr>';}).join('')+'</tbody></table></div>';
+  $('feePaymentList').querySelectorAll('[data-print-fee]').forEach(button=>button.onclick=()=>printFeeReceipt(button.dataset.printFee));
+  $('feePaymentList').querySelectorAll('[data-whatsapp-fee]').forEach(button=>button.onclick=()=>sendFeeWhatsApp(button.dataset.whatsappFee));
+  const demoStudentRows=(demoStudentsRes.data||[]).map(st=>[
+    st.student_code,st.display_name,st.class_name,st.pay_mode,
+    '₹'+Number(st.discount||0).toLocaleString('en-IN'),st.due_date||'—',st.reminder_status||'—'
+  ]);
+  showTable('feeDemoStudentList',['Sample ID','Student','Class','Plan','Discount','Due Date','Reminder Status'],demoStudentRows);
+  const demoPaymentRows=(demoPaymentsRes.data||[]).map(p=>[
+    p.receipt_no,p.payment_date,p.student_code,
+    '₹'+Number(p.amount).toLocaleString('en-IN'),p.payment_mode,p.reference||'—',p.status
+  ]);
+  showTable('feeDemoPaymentList',['Sample Receipt','Date','Sample ID','Amount','Mode','Reference','Status'],demoPaymentRows);
+}
+$('feeAssignBtn').onclick=async()=>{
+  if(!profile||profile.role!=='admin')return;
+  const studentId=$('feeStudentSelect').value, feeClassId=$('feeClassSelect').value;
+  const discount=Number($('feeDiscount').value||0), dueDate=$('feeDueDate').value||null;
+  if(!studentId||!feeClassId||discount<0)return msg('feeAccountMessage','Select a student, fee class and valid discount.',true);
+  const {error}=await db.from('student_fee_accounts').upsert({student_id:studentId,fee_class_id:feeClassId,pay_mode:$('feePayMode').value,discount,due_date:dueDate,updated_by:user.id},{onConflict:'student_id'});
+  if(error)return msg('feeAccountMessage',error.message,true);
+  msg('feeAccountMessage','Student fee account saved.'); await loadFeeManagement();
+};
+$('feePaymentSave').onclick=async()=>{
+  if(!profile||profile.role!=='admin')return;
+  const accountId=$('feePaymentAccount').value, amount=Number($('feePaymentAmount').value);
+  if(!accountId||!Number.isFinite(amount)||amount<=0)return msg('feePaymentMessage','Select an account and enter a valid payment amount.',true);
+  const {error}=await db.from('fee_payments').insert({account_id:accountId,payment_date:$('feePaymentDate').value||today,amount,payment_mode:$('feePaymentMode').value,reference:$('feePaymentRef').value.trim(),recorded_by:user.id});
+  if(error)return msg('feePaymentMessage',error.message,true);
+  $('feePaymentAmount').value='';$('feePaymentRef').value='';
+  msg('feePaymentMessage','Payment saved successfully.');await loadFeeManagement();
+};
+$('feeRefreshBtn').onclick=loadFeeManagement;
+$('feePaymentDate').value=today;
+
 /* ADMIN TABS */
 document.querySelectorAll('[data-tab]').forEach(button => {
   button.onclick = () => {
@@ -996,10 +1117,12 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminLeaves', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent', 'rfidAttendance', 'feeManagement']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
+    if (button.dataset.tab === 'rfidAttendance') loadRfidPage();
+    if (button.dataset.tab === 'feeManagement') loadFeeManagement();
   };
 });
 
@@ -1165,7 +1288,7 @@ $('assignSave').onclick = async () => {
 
 $('subjectAssignSave').onclick = async () => {
   const staffId = $('subjectAssignStaff').value;
-  const subject = $('subjectAssignName').value.trim().replace(/\\s+/g, ' ');
+  const subject = $('subjectAssignName').value.trim().replace(/\s+/g, ' ');
   if(!staffId || !subject) return msg('dashMsg', 'Select a staff member and enter a subject.', true);
   const {error} = await db.from('staff_subject_assignments').upsert(
     {staff_id:staffId,subject_name:subject},{onConflict:'staff_id,subject_name',ignoreDuplicates:true}
@@ -1186,7 +1309,7 @@ async function loadStaff() {
     .from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id);
   if(subjectError) return msg('dashMsg', subjectError.message, true);
 
-  const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
+  const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
   const assignedSubjects = [...new Set((subjectRows||[]).map(x=>x.subject_name).filter(Boolean))];
 
   $('myClasses').textContent = [
@@ -1242,7 +1365,6 @@ async function loadStaff() {
     $('roster').replaceChildren();
     rosterRows = [];
   };
-  await loadOwnLeave('staff','staffLeaveHistory');
   await loadGalleryManager('staff');
 }
 
@@ -1263,14 +1385,14 @@ $('loadRoster').onclick = async () => {
   if(error) return msg('dashMsg',error.message,true);
 
   const matches = (data||[]).filter(student => {
-    const grade = Number(String(student.class_name||'').replace(/\\D/g,''));
+    const grade = Number(String(student.class_name||'').replace(/\D/g,''));
     const hasSubject = (student.subjects||[]).some(x=>String(x).toLowerCase()===subject.toLowerCase());
     if(grade>=1 && grade<=8) return group!=='SENIOR' && !subject;
     if(grade>=9 && grade<=10) return group!=='SENIOR' && !!subject && hasSubject;
     if(grade===11 || grade===12) return group==='SENIOR' && !!subject && hasSubject;
     return false;
   });
-  rosterRows = matches.map(student=>({...student,attendance_subject:Number(String(student.class_name).replace(/\\D/g,''))>=9?subject:''}));
+  rosterRows = matches.map(student=>({...student,attendance_subject:Number(String(student.class_name).replace(/\D/g,''))>=9?subject:''}));
 
   $('roster').innerHTML = rosterRows.length
     ? rosterRows.map(s =>
@@ -1358,82 +1480,23 @@ async function loadStudent() {
   await loadStudentExtras(student);
 }
 
-/* PORTAL EXTRAS: leave, notices and achievements */
-function renderLeaveRows(target, rows, adminMode=false) {
-  if (!rows || !rows.length) { $(target).innerHTML='<p class="muted">No leave requests yet.</p>'; return; }
-  $(target).innerHTML = '<div class="tableWrap"><table><thead><tr><th>Applicant</th><th>Dates</th><th>Reason</th><th>Status</th>'+(adminMode?'<th>Action</th>':'')+'</tr></thead><tbody>'+
-    rows.map(r=>'<tr><td>'+esc(r.requester_role==='staff'?'Staff':(r.student_name||'Student'))+'</td><td>'+esc(r.start_date)+' to '+esc(r.end_date)+'</td><td>'+esc(r.reason)+'</td><td><b>'+esc(r.status)+'</b>'+(r.admin_note?'<br><small>'+esc(r.admin_note)+'</small>':'')+'</td>'+
-    (adminMode?'<td>'+(r.status==='Pending'?'<button class="btn" data-review="'+esc(r.id)+'" data-status="Approved">Approve</button> <button class="btn secondary" data-review="'+esc(r.id)+'" data-status="Rejected">Reject</button>':'—')+'</td>':'')+'</tr>').join('')+'</tbody></table></div>';
-  if(adminMode) $(target).querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>reviewLeave(b.dataset.review,b.dataset.status));
-}
+/* PORTAL EXTRAS: notices and achievements */
 async function loadAdminExtras() {
-  const {data: leaves,error:le}=await db.from('leave_requests').select('*').order('created_at',{ascending:false});
-  if(le) msg('dashMsg','Leave requests: '+le.message,true);
-  const {data: students}=await db.from('students').select('id,full_name,student_code').eq('active',true).order('full_name');
-  const studentMap=Object.fromEntries((students||[]).map(s=>[s.id,s.full_name]));
-  $('achievementStudent').innerHTML='<option value="">Select student</option>'+(students||[]).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code||'')+'</option>').join('');
-  renderLeaveRows('adminLeaveList',(leaves||[]).map(r=>({...r,student_name:studentMap[r.student_id]})),true);
+  const {data: students, error: studentError}=await db.from('students')
+    .select('id,full_name,student_code').eq('active',true).order('full_name');
+  if(studentError) msg('dashMsg','Students: '+studentError.message,true);
+  $('achievementStudent').innerHTML='<option value="">Select student</option>'+(students||[])
+    .map(student=>'<option value="'+esc(student.id)+'">'+esc(student.full_name)+' · '+esc(student.student_code||'')+'</option>').join('');
 
-  const {data:notices,error:ne}=await db.from('academy_notices').select('*').order('created_at',{ascending:false});
-  if(ne) msg('dashMsg','Notices: '+ne.message,true);
-  $('noticeAdminList').innerHTML=(notices||[]).map(n=>'<div class="panel"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(n.audience)+' · '+esc(n.created_at)+'</small></div>').join('')||'<p class="muted">No notices published.</p>';
+  const {data:notices,error:noticeError}=await db.from('academy_notices').select('*').order('created_at',{ascending:false});
+  if(noticeError) msg('dashMsg','Notices: '+noticeError.message,true);
+  $('noticeAdminList').innerHTML=(notices||[]).map(notice=>'<div class="panel"><b>'+esc(notice.title)+'</b><p>'+esc(notice.body)+'</p><small>'+esc(notice.audience)+' · '+esc(notice.created_at)+'</small></div>').join('')||'<p class="muted">No notices published.</p>';
 
-  const {data:achievements,error:ae}=await db.from('student_achievements').select('*').order('achievement_date',{ascending:false});
-  if(ae) msg('dashMsg','Achievements: '+ae.message,true);
-  $('achievementAdminList').innerHTML=(achievements||[]).map(a=>'<div class="panel"><b>'+esc(a.student_name)+' — '+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements added.</p>';
+  const {data:achievements,error:achievementError}=await db.from('student_achievements').select('*').order('achievement_date',{ascending:false});
+  if(achievementError) msg('dashMsg','Achievements: '+achievementError.message,true);
+  $('achievementAdminList').innerHTML=(achievements||[]).map(item=>'<div class="panel"><b>'+esc(item.student_name)+' — '+esc(item.title)+'</b><p>'+esc(item.description||'')+'</p><small>'+esc(item.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements added.</p>';
   await loadGalleryManager('admin');
 }
-async function reviewLeave(id,status) {
-  const note=prompt('Optional note for this decision:')||null;
-  const {error}=await db.from('leave_requests').update({
-    status,admin_note:note,reviewed_by:user.id,reviewed_at:new Date().toISOString()
-  }).eq('id',id);
-  if(error) return msg('dashMsg',error.message,true);
-  msg('dashMsg','Leave request '+status.toLowerCase()+'. A portal notification has been created automatically.');
-  await loadAdminExtras();
-}
-async function submitLeave(role,studentId,startId,endId,reasonId,historyId) {
-  const start=$(startId).value,end=$(endId).value,reason=$(reasonId).value.trim();
-  if(!start||!end||!reason||end<start) return msg('dashMsg','Enter valid leave dates and reason.',true);
-  const {error}=await db.from('leave_requests').insert({requester_user_id:user.id,requester_role:role,student_id:studentId||null,start_date:start,end_date:end,reason});
-  if(error) return msg('dashMsg',error.message,true);
-  $(reasonId).value='';
-  msg('dashMsg','Leave request submitted successfully.');
-  await loadOwnLeave(role,historyId);
-}
-async function loadOwnLeave(role,target) {
-  const {data,error}=await db.from('leave_requests').select('*').eq('requester_user_id',user.id).order('created_at',{ascending:false});
-  if(error) return msg('dashMsg',error.message,true);
-  renderLeaveRows(target,data||[]);
-}
-async function loadNotifications() {
-  const target = profile.role === 'staff' ? 'staffNotifications' : 'studentNotifications';
-  const {data,error}=await db.from('portal_notifications')
-    .select('id,title,message,is_read,created_at')
-    .eq('recipient_user_id',user.id)
-    .order('created_at',{ascending:false});
-  if(error) {
-    $(target).innerHTML='<p class="muted">Notifications are not available yet. The admin may need to complete the database setup.</p>';
-    return;
-  }
-  const rows=data||[];
-  $(target).innerHTML=rows.length ? rows.map(n =>
-    '<div class="panel" style="margin:10px 0;border-left:4px solid '+(n.is_read?'#dce5ed':'#b58a3a')+'">'+
-    '<div class="row"><b>'+esc(n.title)+'</b><small>'+esc(n.created_at)+'</small></div>'+
-    '<p>'+esc(n.message)+'</p>'+
-    (n.is_read?'<small class="muted">Read</small>':'<button class="btn secondary" data-read-notification="'+esc(n.id)+'">Mark as read</button>')+
-    '</div>'
-  ).join('') : '<p class="muted">You have no notifications yet.</p>';
-  $(target).querySelectorAll('[data-read-notification]').forEach(button=>{
-    button.onclick=async()=>{
-      const {error:readError}=await db.from('portal_notifications')
-        .update({is_read:true}).eq('id',button.dataset.readNotification);
-      if(readError) return msg('dashMsg',readError.message,true);
-      await loadNotifications();
-    };
-  });
-}
-
 async function loadRoleNotices(role) {
   const target=role==='staff'?'staffNotices':'studentNotices';
   const {data,error}=await db.from('academy_notices').select('title,body,audience,created_at').eq('published',true).in('audience',['all',role]).order('created_at',{ascending:false});
@@ -1441,13 +1504,10 @@ async function loadRoleNotices(role) {
   $(target).innerHTML=(data||[]).map(n=>'<div class="panel"><b>'+esc(n.title)+'</b><p>'+esc(n.body)+'</p><small>'+esc(n.created_at)+'</small></div>').join('')||'<p class="muted">No new notices.</p>';
 }
 async function loadStudentExtras(student) {
-  $('studentLeaveSubmit').onclick=()=>submitLeave('student',student.id,'studentLeaveStart','studentLeaveEnd','studentLeaveReason','studentLeaveHistory');
-  await loadOwnLeave('student','studentLeaveHistory');
   const {data,error}=await db.from('student_achievements').select('student_name,title,description,achievement_date').eq('published',true).eq('student_id',student.id).order('achievement_date',{ascending:false});
   if(error) return msg('dashMsg',error.message,true);
   $('studentAchievements').innerHTML=(data||[]).map(a=>'<div class="panel"><b>'+esc(a.title)+'</b><p>'+esc(a.description||'')+'</p><small>'+esc(a.achievement_date)+'</small></div>').join('')||'<p class="muted">No achievements posted yet.</p>';
 }
-$('staffLeaveSubmit').onclick=()=>submitLeave('staff',null,'staffLeaveStart','staffLeaveEnd','staffLeaveReason','staffLeaveHistory');
 $('noticePublish').onclick=async()=>{
   const title=$('noticeTitle').value.trim(),body=$('noticeBody').value.trim();
   if(!title||!body) return msg('dashMsg','Enter a notice title and details.',true);
@@ -1470,6 +1530,134 @@ $('achievementSave').onclick=async()=>{
 };
 
 
+
+/* RFID ATTENDANCE — admin-only, Supabase-backed */
+let rfidStudents = [];
+let rfidCards = [];
+let rfidEvents = [];
+let rfidLastScan = '';
+let rfidLastScanAt = 0;
+
+function rfidLocalDayStart() {
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d.toISOString();
+}
+function rfidDownload(name, rows) {
+  const csv='\ufeff'+rows.map(row=>row.map(value=>'"'+String(value??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const a=document.createElement('a');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);
+}
+function rfidSetMessage(message, error=false) {
+  const host=$('rfidMessage');
+  host.textContent=message;
+  host.className='notice'+(error?' error':'');
+}
+function rfidFocus() { setTimeout(()=>$('rfidScanInput')?.focus(),80); }
+
+async function loadRfidPage() {
+  if (!profile || profile.role !== 'admin') return;
+  const [studentResult,cardResult,eventResult]=await Promise.all([
+    db.from('students').select('id,student_code,full_name,class_name,active').eq('active',true).order('full_name'),
+    db.from('rfid_card_assignments').select('id,student_id,card_uid,created_at'),
+    db.from('rfid_attendance_events').select('id,student_id,event_type,scanned_at,method').order('scanned_at',{ascending:false}).limit(250)
+  ]);
+  if(studentResult.error||cardResult.error||eventResult.error) {
+    rfidSetMessage('RFID data could not load: '+(studentResult.error||cardResult.error||eventResult.error).message,true);
+    return;
+  }
+  rfidStudents=studentResult.data||[];
+  rfidCards=cardResult.data||[];
+  rfidEvents=eventResult.data||[];
+  $('rfidStudentSelect').innerHTML='<option value="">Select student</option>'+rfidStudents.map(st=>'<option value="'+esc(st.id)+'">'+esc(st.full_name)+' · '+esc(st.student_code||'')+' · '+esc(st.class_name||'')+'</option>').join('');
+  renderRfidPage();
+  rfidFocus();
+}
+function renderRfidPage() {
+  const studentMap=Object.fromEntries(rfidStudents.map(st=>[st.id,st]));
+  $('rfidCardList').innerHTML=rfidCards.length
+    ? '<div class="tableWrap"><table><thead><tr><th>Student</th><th>Class</th><th>RFID UID</th><th>Action</th></tr></thead><tbody>'+rfidCards.map(card=>{
+      const st=studentMap[card.student_id]||{};
+      return '<tr><td>'+esc(st.full_name||'Inactive / unavailable')+'</td><td>'+esc(st.class_name||'—')+'</td><td>'+esc(card.card_uid)+'</td><td><button class="btn secondary" data-rfid-remove="'+esc(card.id)+'">Unlink</button></td></tr>';
+    }).join('')+'</tbody></table></div>'
+    : '<p class="muted">No RFID cards linked yet.</p>';
+  $('rfidCardList').querySelectorAll('[data-rfid-remove]').forEach(button=>button.onclick=async()=>{
+    if(!confirm('Unlink this RFID card? Existing attendance records will remain.')) return;
+    const {error}=await db.from('rfid_card_assignments').delete().eq('id',button.dataset.rfidRemove);
+    if(error) return rfidSetMessage(error.message,true);
+    rfidSetMessage('RFID card unlinked. Past attendance records are unchanged.');
+    await loadRfidPage();
+  });
+
+  const todayEvents=rfidEvents.filter(event=>new Date(event.scanned_at).toDateString()===new Date().toDateString());
+  const presentCount=new Set(todayEvents.filter(event=>event.event_type==='IN').map(event=>event.student_id)).size;
+  const outCount=todayEvents.filter(event=>event.event_type==='OUT').length;
+  $('rfidStats').innerHTML='<div class="stat"><span>Linked RFID cards</span><b>'+rfidCards.length+'</b></div><div class="stat"><span>Today IN</span><b>'+presentCount+'</b></div><div class="stat"><span>Today OUT</span><b>'+outCount+'</b></div>';
+  $('rfidEventList').innerHTML=rfidEvents.length
+    ? '<div class="tableWrap"><table><thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Class</th><th>Status</th><th>Method</th></tr></thead><tbody>'+rfidEvents.map(event=>{
+      const st=studentMap[event.student_id]||{};
+      const dt=new Date(event.scanned_at);
+      return '<tr><td>'+esc(dt.toLocaleDateString('en-IN'))+'</td><td>'+esc(dt.toLocaleTimeString('en-IN'))+'</td><td>'+esc(st.full_name||'Student')+'</td><td>'+esc(st.class_name||'—')+'</td><td>'+esc(event.event_type)+'</td><td>'+esc(event.method)+'</td></tr>';
+    }).join('')+'</tbody></table></div>'
+    : '<p class="muted">No RFID attendance records yet.</p>';
+}
+async function saveRfidCard() {
+  const studentId=$('rfidStudentSelect').value;
+  const uid=$('rfidUidInput').value.trim();
+  if(!studentId||!uid) return rfidSetMessage('Select a student and enter or scan the RFID UID.',true);
+  const {error}=await db.from('rfid_card_assignments').upsert({student_id:studentId,card_uid:uid,assigned_by:user.id},{onConflict:'student_id'});
+  if(error) return rfidSetMessage('Could not save card link: '+error.message,true);
+  $('rfidUidInput').value='';
+  rfidSetMessage('RFID card linked successfully.');
+  await loadRfidPage();
+}
+async function scanRfidAttendance(rawValue,method='RFID') {
+  const raw=String(rawValue||'').trim();
+  if(!raw) return;
+  const now=Date.now();
+  if(raw===rfidLastScan&&now-rfidLastScanAt<4000) {
+    rfidSetMessage('Duplicate scan ignored. Please wait a few seconds.',true);
+    $('rfidScanInput').value='';rfidFocus();return;
+  }
+  rfidLastScan=raw;rfidLastScanAt=now;
+  let studentId=null;
+  if(method==='RFID') {
+    const {data:card,error:cardError}=await db.from('rfid_card_assignments').select('student_id').eq('card_uid',raw).maybeSingle();
+    if(cardError) return rfidSetMessage(cardError.message,true);
+    studentId=card?.student_id||null;
+  }
+  if(!studentId) {
+    const {data:student,error:studentError}=await db.from('students').select('id').eq('student_code',raw).maybeSingle();
+    if(studentError) return rfidSetMessage(studentError.message,true);
+    studentId=student?.id||null;
+  }
+  if(!studentId) {rfidSetMessage('Card / Student ID not found. Link the card to a student first.',true);$('rfidScanInput').value='';rfidFocus();return;}
+  const {data:lastRows,error:lastError}=await db.from('rfid_attendance_events').select('event_type').eq('student_id',studentId).gte('scanned_at',rfidLocalDayStart()).order('scanned_at',{ascending:false}).limit(1);
+  if(lastError) return rfidSetMessage(lastError.message,true);
+  const eventType=(!lastRows?.length||lastRows[0].event_type==='OUT')?'IN':'OUT';
+  const {error:insertError}=await db.from('rfid_attendance_events').insert({student_id:studentId,event_type:eventType,method,scanned_by:user.id});
+  if(insertError) return rfidSetMessage('Attendance was not saved: '+insertError.message,true);
+  const st=rfidStudents.find(item=>item.id===studentId);
+  rfidSetMessage((st?.full_name||'Student')+' — '+eventType+' recorded successfully.');
+  $('rfidScanInput').value='';
+  await loadRfidPage();
+  rfidFocus();
+}
+$('rfidSaveCard').onclick=saveRfidCard;
+$('rfidClearCard').onclick=()=>{$('rfidStudentSelect').value='';$('rfidUidInput').value='';};
+$('rfidScanInput').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();scanRfidAttendance($('rfidScanInput').value,'RFID');}});
+$('rfidUidInput').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('rfidScanInput').value=$('rfidUidInput').value;rfidSetMessage('UID captured. Save the card link to continue.');}});
+$('rfidManualBtn').onclick=()=>scanRfidAttendance($('rfidScanInput').value,'Manual');
+$('rfidFocusBtn').onclick=rfidFocus;
+$('rfidRefreshBtn').onclick=loadRfidPage;
+$('rfidExportBtn').onclick=()=>{
+  const studentMap=Object.fromEntries(rfidStudents.map(st=>[st.id,st]));
+  rfidDownload('rfid_attendance.csv',[['Date','Time','Student ID','Name','Class','Status','Method'],...rfidEvents.map(event=>{
+    const st=studentMap[event.student_id]||{},dt=new Date(event.scanned_at);
+    return [dt.toLocaleDateString('en-IN'),dt.toLocaleTimeString('en-IN'),st.student_code||'',st.full_name||'',st.class_name||'',event.event_type,event.method];
+  })]);
+};
 
 /* WEBSITE CONTENT CMS */
 const WEBSITE_FIELDS = [
