@@ -515,7 +515,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         <!-- CLASS ASSIGNMENT -->
         <div class="panel hidden" id="assignments">
           <h3>Assign Sections to Staff</h3>
-          <p class="muted">Each staff member can be assigned up to two sections. A section can be assigned to only one staff member.</p>
+          <p class="muted">Assign regular sections, then add extra class-and-subject periods from another board or section when needed.</p>
 
           <div class="fields">
             <div class="field">
@@ -537,6 +537,19 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button class="btn" id="assignSave">Assign Section</button>
           <p class="muted">Choose a staff member and a section, then click Assign Section again to add the second section. Remove an old assignment before replacing it.</p>
           <div id="assignRecords"></div>
+          <div class="panel" style="margin-top:18px">
+            <h3>Additional Class &amp; Subject Timetable (Classes 9–10)</h3>
+            <p class="muted">Example: a Section C staff member can take CBSE Section D Class 9 Social Science on Monday and Class 10 Social Science on Tuesday.</p>
+            <div class="fields">
+              <div class="field"><label>Select Staff</label><select id="teachingAssignStaff"></select></div>
+              <div class="field"><label>Board</label><select id="teachingAssignBoard"><option>CBSE</option><option>State Board</option></select></div>
+              <div class="field"><label>Class</label><select id="teachingAssignClass"><option>Class 9</option><option>Class 10</option></select></div>
+              <div class="field"><label>Subject</label><input id="teachingAssignSubject" placeholder="e.g. Social Science"></div>
+              <div class="field"><label>Day</label><select id="teachingAssignDay"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="">Any day / not specified</option></select></div>
+            </div>
+            <button class="btn" id="teachingAssignSave">Add Class &amp; Subject</button>
+            <div id="teachingAssignmentRecords"></div>
+          </div>
           <div class="panel" style="margin-top:18px">
             <h3>Assign Subjects to Staff (Classes 11–12)</h3>
             <p class="muted">A staff member can handle multiple subjects. They will only see senior students who study their assigned subjects.</p>
@@ -774,6 +787,7 @@ $('adBoard').addEventListener('change', updateAdmissionSection);
 let user = null;
 let profile = null;
 let rosterRows = [];
+let staffTeachingAssignments = [];
 
 function msg(id, text, bad = false) {
   const target = $(id);
@@ -907,9 +921,11 @@ async function loadAdmin() {
       '</option>'
     ).join('');
   });
-  $('subjectAssignStaff').innerHTML = staffList.map(s =>
+  const staffOptions = staffList.map(s =>
     '<option value="' + esc(s.id) + '">' + esc(s.full_name) + ' (' + esc(s.login_id) + ')</option>'
   ).join('');
+  $('subjectAssignStaff').innerHTML = staffOptions;
+  $('teachingAssignStaff').innerHTML = staffOptions;
 
   const { data: students, error } = await db
     .from('students')
@@ -997,6 +1013,29 @@ async function loadAdmin() {
   }
 
   const staffNameMap = Object.fromEntries(staffList.map(s => [s.id, s.full_name]));
+  const {data: teachingAssignments, error: teachingAssignmentError} = await db
+    .from('staff_teaching_assignments')
+    .select('id,staff_id,board_name,section_name,class_name,subject_name,day_of_week')
+    .order('board_name').order('class_name').order('subject_name');
+  if(teachingAssignmentError) {
+    msg('dashMsg','Additional class assignments: '+teachingAssignmentError.message,true);
+  } else {
+    const dayNames=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    $('teachingAssignmentRecords').innerHTML = teachingAssignments.length
+      ? '<div class="tableWrap"><table><thead><tr><th>Staff</th><th>Board / Section</th><th>Class</th><th>Subject</th><th>Day</th><th>Action</th></tr></thead><tbody>' +
+        teachingAssignments.map(a=>'<tr><td>'+esc(staffNameMap[a.staff_id]||a.staff_id)+'</td><td>'+esc(a.board_name)+' · Section '+esc(a.section_name)+'</td><td>'+esc(a.class_name)+'</td><td>'+esc(a.subject_name)+'</td><td>'+esc(a.day_of_week?dayNames[a.day_of_week]:'Any day')+'</td><td><button class="btn secondary" data-remove-teaching="'+esc(a.id)+'">Remove</button></td></tr>').join('')+
+        '</tbody></table></div>'
+      : '<p class="muted">No additional class-and-subject timetable assignments yet.</p>';
+    $('teachingAssignmentRecords').querySelectorAll('[data-remove-teaching]').forEach(button=>{
+      button.onclick=async()=>{
+        if(!confirm('Remove this additional class assignment?'))return;
+        const {error}=await db.from('staff_teaching_assignments').delete().eq('id',button.dataset.removeTeaching);
+        if(error)return msg('dashMsg',error.message,true);
+        msg('dashMsg','Additional class assignment removed.');
+        await loadAdmin();
+      };
+    });
+  }
   const {data: subjectAssignments, error: subjectAssignmentError} = await db
     .from('staff_subject_assignments').select('staff_id,subject_name').order('subject_name');
   if(subjectAssignmentError) {
@@ -1248,6 +1287,25 @@ $('assignSave').onclick = async () => {
   await loadAdmin();
 };
 
+$('teachingAssignSave').onclick = async () => {
+  const staffId=$('teachingAssignStaff').value;
+  const board=$('teachingAssignBoard').value;
+  const className=$('teachingAssignClass').value;
+  const subject=$('teachingAssignSubject').value.trim().replace(/\s+/g,' ');
+  const dayValue=$('teachingAssignDay').value;
+  const section=sectionFor(className,board);
+  if(!staffId||!board||!className||!subject||!section)
+    return msg('dashMsg','Choose staff, board, class and subject.',true);
+  const {error}=await db.from('staff_teaching_assignments').insert({
+    staff_id:staffId,board_name:board,section_name:section,class_name:className,
+    subject_name:subject,day_of_week:dayValue?Number(dayValue):null
+  });
+  if(error)return msg('dashMsg',error.code==='23505'?'This class, subject and day are already assigned to another staff member.':error.message,true);
+  $('teachingAssignSubject').value='';
+  msg('dashMsg',board+' Section '+section+' · '+className+' · '+subject+' assigned.');
+  await loadAdmin();
+};
+
 $('subjectAssignSave').onclick = async () => {
   const staffId = $('subjectAssignStaff').value;
   const subject = $('subjectAssignName').value.trim().replace(/\s+/g, ' ');
@@ -1270,18 +1328,27 @@ async function loadStaff() {
   const {data: subjectRows, error: subjectError} = await db
     .from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id);
   if(subjectError) return msg('dashMsg', subjectError.message, true);
+  const {data: teachingRows, error: teachingError} = await db
+    .from('staff_teaching_assignments')
+    .select('id,board_name,section_name,class_name,subject_name,day_of_week')
+    .eq('staff_id',user.id);
+  if(teachingError) return msg('dashMsg',teachingError.message,true);
+  const dayNames=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  staffTeachingAssignments=teachingRows||[];
 
   const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
   const assignedSubjects = [...new Set((subjectRows||[]).map(x=>x.subject_name).filter(Boolean))];
 
   $('myClasses').textContent = [
     sections.length ? sections.map(x=>'Section '+x).join(' · ') : '',
+    staffTeachingAssignments.length ? staffTeachingAssignments.length+' additional class/subject period(s)' : '',
     assignedSubjects.length ? 'Senior subjects: '+assignedSubjects.join(', ') : ''
-  ].filter(Boolean).join(' | ') || 'No sections or senior subjects assigned yet. Please contact the admin.';
+  ].filter(Boolean).join(' | ') || 'No sections or class-subject assignments yet. Please contact the admin.';
 
   $('classSelect').innerHTML =
     sections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
-    (assignedSubjects.length ? '<option value="SENIOR">My Subject Students</option>' : '');
+    staffTeachingAssignments.map(a=>'<option value="TEACH:'+esc(a.id)+'">'+esc(a.board_name)+' · Section '+esc(a.section_name)+' · '+esc(a.class_name)+' · '+esc(a.subject_name)+' · '+esc(a.day_of_week?dayNames[a.day_of_week]:'Any day')+'</option>').join('')+
+    (assignedSubjects.length ? '<option value="SENIOR">My Subject Students (Classes 11–12)</option>' : '');
 
   const sectionSubjects = new Set();
   if(sections.length) {
@@ -1298,7 +1365,13 @@ async function loadStaff() {
   const renderSubjectOptions = () => {
     const group = $('classSelect').value;
     let choices = [];
-    if(group==='SENIOR') {
+    if(group.startsWith('TEACH:')) {
+      const assignment=staffTeachingAssignments.find(a=>'TEACH:'+a.id===group);
+      choices=assignment?[assignment.subject_name]:[];
+      subjectLabel.textContent='Assigned subject';
+      subjectSelect.disabled=true;
+      subjectSelect.required=true;
+    } else if(group==='SENIOR') {
       choices = assignedSubjects;
       subjectLabel.textContent = 'Subject (Assigned Classes 11–12)';
       subjectSelect.disabled = false;
@@ -1334,13 +1407,25 @@ async function loadStaff() {
 $('loadRoster').onclick = async () => {
   const group = $('classSelect').value;
   const subject = $('attendanceSubject').value;
-  if(!group) return msg('dashMsg','No assigned section or senior subject access available.',true);
+  if(!group) return msg('dashMsg','No assigned section or class-subject access available.',true);
   if(group==='SENIOR' && !subject) return msg('dashMsg','Select your assigned subject first.',true);
 
+  const isTeaching=group.startsWith('TEACH:');
+  const teachingAssignment=isTeaching?staffTeachingAssignments.find(a=>'TEACH:'+a.id===group):null;
+  if(isTeaching&&!teachingAssignment)return msg('dashMsg','This class assignment could not be found. Refresh the page.',true);
+  if(isTeaching&&teachingAssignment.day_of_week){
+    const selectedDate=$('classDate').value;
+    if(!selectedDate)return msg('dashMsg','Select the attendance date first.',true);
+    const weekday=new Date(selectedDate+'T12:00:00').getDay()||7;
+    if(weekday!==teachingAssignment.day_of_week)return msg('dashMsg','This class is scheduled for '+dayNames[teachingAssignment.day_of_week]+'. Choose a matching attendance date.',true);
+  }
+
   let query = db.from('student_roster')
-    .select('student_id,full_name,class_name,section_name,subjects')
+    .select('student_id,full_name,class_name,section_name,board_name,subjects')
     .eq('active',true).order('full_name');
-  if(group==='SENIOR') query = query.in('class_name',['Class 11','Class 12']);
+  if(isTeaching){
+    query=query.eq('board_name',teachingAssignment.board_name).eq('section_name',teachingAssignment.section_name).eq('class_name',teachingAssignment.class_name);
+  } else if(group==='SENIOR') query = query.in('class_name',['Class 11','Class 12']);
   else query = query.eq('section_name',group);
 
   const {data,error} = await query;
@@ -1349,6 +1434,7 @@ $('loadRoster').onclick = async () => {
   const matches = (data||[]).filter(student => {
     const grade = Number(String(student.class_name||'').replace(/\D/g,''));
     const hasSubject = (student.subjects||[]).some(x=>String(x).toLowerCase()===subject.toLowerCase());
+    if(isTeaching) return grade>=9&&grade<=10&&hasSubject;
     if(grade>=1 && grade<=8) return group!=='SENIOR' && !subject;
     if(grade>=9 && grade<=10) return group!=='SENIOR' && !!subject && hasSubject;
     if(grade===11 || grade===12) return group==='SENIOR' && !!subject && hasSubject;
