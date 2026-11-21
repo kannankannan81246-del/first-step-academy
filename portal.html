@@ -380,6 +380,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <button data-tab="websiteContent">Website Content</button>
           <button data-tab="rfidAttendance">RFID Attendance</button>
           <button data-tab="feeManagement">Fee Management</button>
+          <button data-tab="attendanceReports">Attendance Reports</button>
         </div>
 
         <!-- ADMISSION -->
@@ -670,6 +671,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
           <p class="muted">Fee records are not shown in Staff or Student dashboards. Database access is restricted to authenticated academy admins.</p>
         </div>
+        <div class="panel hidden" id="attendanceReports"><h3>Monthly Attendance Reports</h3><p class="muted">Download the full academy report with separate worksheets for Sections A–E, Spoken English, Hindi and CBSE Classes 11–12.</p><div class="fields"><div class="field"><label>Month</label><input id="adminAttendanceReportMonth" type="month"></div></div><button class="btn" id="adminAttendanceReportDownload">Download Full Monthly Excel (.xlsx)</button><div id="adminAttendanceReportMsg"></div></div>
         </div>
       </div>
 
@@ -1486,6 +1488,8 @@ $('saveRoster').onclick = async () => {
 
 /* MONTHLY SECTION-WISE EXCEL EXPORT */
 $('attendanceReportMonth').value=today.slice(0,7);
+$('adminAttendanceReportMonth').value=today.slice(0,7);
+$('adminAttendanceReportDownload').onclick=()=>{const m=$('adminAttendanceReportMonth').value;if(!m)return msg('adminAttendanceReportMsg','Select a month first.',true);$('attendanceReportMonth').value=m;$('attendanceReportDownload').click();msg('adminAttendanceReportMsg','Your full monthly Excel report is being prepared.');};
 $('attendanceReportDownload').onclick=async()=>{
  const month=$('attendanceReportMonth').value;if(!month)return msg('attendanceReportMsg','Select a month first.',true);
  if(typeof XLSX==='undefined')return msg('attendanceReportMsg','Excel export library did not load. Refresh and retry.',true);
@@ -1497,7 +1501,7 @@ $('attendanceReportDownload').onclick=async()=>{
  for(const [label,kind] of [['Spoken English','spoken'],['Hindi','hindi']]){const {data,error}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).contains('subjects',[label]).order('full_name');if(error)return msg('attendanceReportMsg',label+': '+error.message,true);addSheet(label,data,kind);}
  const {data:assignedSubjectRows,error:assignedSubjectError}=await db.from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id);if(assignedSubjectError)return msg('attendanceReportMsg',assignedSubjectError.message,true);const seniorSubjects=(assignedSubjectRows||[]).map(x=>x.subject_name);
  const {data:senior,error:seniorError}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).eq('board_name','CBSE').in('class_name',['Class 11','Class 12']).order('full_name');if(seniorError)return msg('attendanceReportMsg','CBSE Classes 11–12: '+seniorError.message,true);
- const seniorRows=(senior||[]).map(s=>({...s,subjects:(s.subjects||[]).filter(sub=>seniorSubjects.some(assigned=>assigned.toLowerCase()===sub.toLowerCase()))}));
+ const seniorRows=profile?.role==='admin'?(senior||[]):(senior||[]).map(s=>({...s,subjects:(s.subjects||[]).filter(sub=>seniorSubjects.some(assigned=>assigned.toLowerCase()===sub.toLowerCase()))}));
  addSheet('CBSE Class 11',seniorRows.filter(s=>s.class_name==='Class 11'),'senior');addSheet('CBSE Class 12',seniorRows.filter(s=>s.class_name==='Class 12'),'senior');XLSX.writeFile(wb,'FSA_Attendance_'+month+'.xlsx');msg('attendanceReportMsg','Monthly Excel downloaded successfully.');
 };
 /* STUDENT DASHBOARD */
