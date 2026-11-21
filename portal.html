@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Academy Portal | First Step Academy</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
 :root {
@@ -529,14 +530,14 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
                 <option value="A">Section A · Classes 1–5</option>
                 <option value="B">Section B · CBSE Classes 6–8</option>
                 <option value="C">Section C · State Board Classes 6–10</option>
-                <option value="D">Section D · CBSE 9–10</option>
+                <option value="D">Section D · CBSE Class 9</option>
+                <option value="E">Section E · CBSE Class 10</option>
               </select>
             </div>
           </div>
 
           <button class="btn" id="assignSave">Assign Section</button>
-          <p class="muted">Choose a staff member and a section, then click Assign Section again to add the second section. Remove an old assignment before replacing it.</p>
-          <div id="assignRecords"></div>
+          <p class="muted">Choose a staff member and a section, then click Assign Section again to add another section.</p><div id="assignRecords"></div><div class="panel" style="margin-top:18px"><h3>Staff Attendance Access</h3><p class="muted">Choose assigned sections only or all sections A–E.</p><div class="fields"><div class="field"><label>Staff</label><select id="attendanceAccessStaff"></select></div><div class="field"><label>Permission</label><select id="attendanceAccessMode"><option value="assigned">Assigned Sections Only</option><option value="all">All Sections (A–E)</option></select></div></div><button class="btn" id="attendanceAccessSave">Save Attendance Permission</button><div id="attendanceAccessList"></div></div>
           <div class="panel" style="margin-top:18px">
             <h3>Additional Class &amp; Subject Timetable (Classes 9–10)</h3>
             <p class="muted">Example: a Section C staff member can take CBSE Section D Class 9 Social Science on Monday and Class 10 Social Science on Tuesday.</p>
@@ -702,6 +703,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 
           <button class="btn" id="saveRoster">Save Student Attendance</button>
         </div>
+        <div class="panel"><h3>Monthly Attendance Excel</h3><p class="muted">Separate worksheets for Sections A–E, Spoken English, Hindi, CBSE Class 11 and CBSE Class 12.</p><div class="fields"><div class="field"><label>Month</label><input id="attendanceReportMonth" type="month"></div></div><button class="btn secondary" id="attendanceReportDownload">Download Monthly Excel (.xlsx)</button><div id="attendanceReportMsg"></div></div>
         <div class="panel">
           <h3>Upload Gallery Photo</h3>
           <p class="muted">Your photo will be sent to the admin for approval before appearing publicly.</p>
@@ -765,7 +767,8 @@ function sectionFor(className, board) {
   if (board === 'CBSE' && n >= 1 && n <= 5) return 'A';
   if (board === 'CBSE' && n >= 6 && n <= 8) return 'B';
   if (board === 'State Board' && n >= 6 && n <= 10) return 'C';
-  if (board === 'CBSE' && n >= 9 && n <= 10) return 'D';
+  if (board === 'CBSE' && n === 9) return 'D';
+  if (board === 'CBSE' && n === 10) return 'E';
   return '';
 }
 
@@ -904,7 +907,7 @@ async function loadDashboard() {
 async function loadAdmin() {
   const { data: staff, error: staffError } = await db
     .from('profiles')
-    .select('id,full_name,login_id')
+    .select('id,full_name,login_id,attendance_access')
     .eq('role', 'staff')
     .order('full_name');
 
@@ -921,6 +924,7 @@ async function loadAdmin() {
       '</option>'
     ).join('');
   });
+  $('attendanceAccessStaff').innerHTML=staffList.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' ('+esc(s.login_id)+')</option>').join('');$('attendanceAccessList').innerHTML='<div class="tableWrap"><table><thead><tr><th>Staff</th><th>Permission</th></tr></thead><tbody>'+staffList.map(s=>'<tr><td>'+esc(s.full_name)+'</td><td>'+(s.attendance_access==='all'?'All Sections (A–E)':'Assigned Sections Only')+'</td></tr>').join('')+'</tbody></table></div>';$('attendanceAccessStaff').onchange=()=>{const s=staffList.find(x=>x.id===$('attendanceAccessStaff').value);$('attendanceAccessMode').value=s?.attendance_access||'assigned';};$('attendanceAccessStaff').onchange();
   const staffOptions = staffList.map(s =>
     '<option value="' + esc(s.id) + '">' + esc(s.full_name) + ' (' + esc(s.login_id) + ')</option>'
   ).join('');
@@ -996,7 +1000,7 @@ async function loadAdmin() {
     $('assignRecords').innerHTML = assignments.length
       ? '<div class="tableWrap"><table><thead><tr><th>Staff</th><th>Assigned Section</th><th>Action</th></tr></thead><tbody>' +
         assignments.map(a => '<tr><td>' + esc(staffMap[a.staff_id] || a.staff_id) + '</td><td>' +
-          esc(/^Section [A-D]$/.test(a.class_name || '') ? a.class_name : 'Needs section mapping (' + (a.class_name || 'Unassigned') + ')') +
+          esc(/^Section [A-E]$/.test(a.class_name || '') ? a.class_name : 'Needs section mapping (' + (a.class_name || 'Unassigned') + ')') +
           '</td><td><button class="btn secondary" data-remove-class="' + esc(a.staff_id) + '" data-class-name="' + esc(a.class_name) + '">Remove</button></td></tr>').join('') +
         '</tbody></table></div>'
       : '<p class="muted">No staff section assignments yet.</p>';
@@ -1260,6 +1264,7 @@ $('staffSave').onclick = async () => {
   }
 };
 
+$('attendanceAccessSave').onclick=async()=>{const staffId=$('attendanceAccessStaff').value,mode=$('attendanceAccessMode').value;if(!staffId)return msg('dashMsg','Select a staff member first.',true);const {error}=await db.from('profiles').update({attendance_access:mode}).eq('id',staffId).eq('role','staff');if(error)return msg('dashMsg',error.message,true);msg('dashMsg','Staff attendance permission updated.');await loadAdmin();};
 /* ASSIGN UP TO TWO SECTIONS TO EACH STAFF MEMBER */
 $('assignSave').onclick = async () => {
   const staffId = $('assignStaff').value;
@@ -1336,27 +1341,27 @@ async function loadStaff() {
   const dayNames=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   staffTeachingAssignments=teachingRows||[];
 
-  const sections = [...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\s+/i,'')).filter(x=>/^[A-D]$/.test(x)))];
+  const {data:accessProfile,error:accessError}=await db.from('profiles').select('attendance_access').eq('id',user.id).single();if(accessError)return msg('dashMsg',accessError.message,true);const attendanceAccess=accessProfile?.attendance_access||'assigned';
+  const sections=[...new Set((sectionRows||[]).map(x=>String(x.class_name||'').replace(/^Section\s+/i,'')).filter(x=>/^[A-E]$/.test(x)))];const visibleSections=attendanceAccess==='all'?['A','B','C','D','E']:sections;
   const assignedSubjects = [...new Set((subjectRows||[]).map(x=>x.subject_name).filter(Boolean))];
 
   $('myClasses').textContent = [
-    sections.length ? sections.map(x=>'Section '+x).join(' · ') : '',
+    visibleSections.length ? (attendanceAccess==='all'?'All Sections: ':'')+visibleSections.map(x=>'Section '+x).join(' · ') : '',
     staffTeachingAssignments.length ? staffTeachingAssignments.length+' additional class/subject period(s)' : '',
     assignedSubjects.length ? 'Senior subjects: '+assignedSubjects.join(', ') : ''
   ].filter(Boolean).join(' | ') || 'No sections or class-subject assignments yet. Please contact the admin.';
 
   $('classSelect').innerHTML =
-    sections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
+    visibleSections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
+    '<option value="SPOKEN">Spoken English</option><option value="HINDI">Hindi</option>' +
     staffTeachingAssignments.map(a=>'<option value="TEACH:'+esc(a.id)+'">'+esc(a.board_name)+' · Section '+esc(a.section_name)+' · '+esc(a.class_name)+' · '+esc(a.subject_name)+' · '+esc(a.day_of_week?dayNames[a.day_of_week]:'Any day')+'</option>').join('')+
     (assignedSubjects.length ? '<option value="SENIOR">My Subject Students (Classes 11–12)</option>' : '');
 
   const sectionSubjects = new Set();
-  if(sections.length) {
-    const {data: sectionStudents, error: rosterError} = await db.from('student_roster')
-      .select('class_name,subjects').in('section_name',sections).eq('active',true);
+  if(visibleSections.length) {
+    const {data: sectionStudents,error:rosterError}=await db.from('student_roster').select('class_name,subjects,board_name').in('section_name',visibleSections).eq('active',true);
     if(rosterError) return msg('dashMsg',rosterError.message,true);
-    (sectionStudents||[]).filter(s=>['Class 9','Class 10'].includes(s.class_name))
-      .forEach(s=>(s.subjects||[]).forEach(subject=>sectionSubjects.add(subject)));
+    (sectionStudents||[]).filter(s=>s.board_name==='CBSE'&&['Class 9','Class 10'].includes(s.class_name)).forEach(s=>(s.subjects||[]).forEach(subject=>sectionSubjects.add(subject)));
   }
 
   const subjectSelect = $('attendanceSubject');
@@ -1376,20 +1381,19 @@ async function loadStaff() {
       subjectLabel.textContent = 'Subject (Assigned Classes 11–12)';
       subjectSelect.disabled = false;
       subjectSelect.required = true;
-    } else if(group==='C' || group==='D') {
-      choices = [...sectionSubjects];
-      subjectLabel.textContent = 'Subject (Classes 9–10; no subject for Class 8)';
-      subjectSelect.disabled = false;
-      subjectSelect.required = false;
+    } else if(group==='D' || group==='E') {
+      choices=[...sectionSubjects];subjectLabel.textContent='Subject (CBSE Classes 9–10)';subjectSelect.disabled=false;subjectSelect.required=true;
     } else {
       subjectLabel.textContent = 'Subject (Not required for Classes 1–8)';
       subjectSelect.disabled = true;
       subjectSelect.required = false;
     }
-    subjectSelect.innerHTML = '<option value="">No Subject (Classes 1–8)</option>' +
+    subjectSelect.innerHTML = '<option value="">'+(subjectSelect.required?'Select Subject':'No Subject Required')+'</option>' +
       choices.sort((a,b)=>a.localeCompare(b)).map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
     const activeAssignment=group.startsWith('TEACH:')?staffTeachingAssignments.find(a=>'TEACH:'+a.id===group):null;
-    subjectSelect.value = activeAssignment ? activeAssignment.subject_name : '';
+    if(group==='SPOKEN') {subjectLabel.textContent='Attendance Category';subjectSelect.disabled=true;subjectSelect.required=true;subjectSelect.innerHTML='<option value="Spoken English">Spoken English</option>';}
+    else if(group==='HINDI') {subjectLabel.textContent='Attendance Category';subjectSelect.disabled=true;subjectSelect.required=true;subjectSelect.innerHTML='<option value="Hindi">Hindi</option>';}
+    subjectSelect.value = group==='SPOKEN'?'Spoken English':group==='HINDI'?'Hindi':activeAssignment?activeAssignment.subject_name:'';
   };
   renderSubjectOptions();
   $('classSelect').onchange = () => {
@@ -1409,7 +1413,7 @@ $('loadRoster').onclick = async () => {
   const group = $('classSelect').value;
   const subject = $('attendanceSubject').value;
   if(!group) return msg('dashMsg','No assigned section or class-subject access available.',true);
-  if(group==='SENIOR' && !subject) return msg('dashMsg','Select your assigned subject first.',true);
+  if((group==='SENIOR'||group==='D'||group==='E')&&!subject)return msg('dashMsg','Select a subject before loading this class.',true);
 
   const isTeaching=group.startsWith('TEACH:');
   const teachingAssignment=isTeaching?staffTeachingAssignments.find(a=>'TEACH:'+a.id===group):null;
@@ -1427,8 +1431,9 @@ $('loadRoster').onclick = async () => {
     .eq('active',true).order('full_name');
   if(isTeaching){
     query=query.eq('board_name',teachingAssignment.board_name).eq('section_name',teachingAssignment.section_name).eq('class_name',teachingAssignment.class_name);
-  } else if(group==='SENIOR') query = query.in('class_name',['Class 11','Class 12']);
-  else query = query.eq('section_name',group);
+  } else if(group==='SENIOR') query=query.eq('board_name','CBSE').in('class_name',['Class 11','Class 12']);
+  else if(group==='SPOKEN'||group==='HINDI') query=query.contains('subjects',[subject]);
+  else query=query.eq('section_name',group);
 
   const {data,error} = await query;
   if(error) return msg('dashMsg',error.message,true);
@@ -1436,13 +1441,16 @@ $('loadRoster').onclick = async () => {
   const matches = (data||[]).filter(student => {
     const grade = Number(String(student.class_name||'').replace(/\D/g,''));
     const hasSubject = (student.subjects||[]).some(x=>String(x).toLowerCase()===subject.toLowerCase());
-    if(isTeaching) return grade>=9&&grade<=10&&hasSubject;
-    if(grade>=1 && grade<=8) return group!=='SENIOR' && !subject;
-    if(grade>=9 && grade<=10) return group!=='SENIOR' && !!subject && hasSubject;
-    if(grade===11 || grade===12) return group==='SENIOR' && !!subject && hasSubject;
+    if(isTeaching)return grade>=9&&grade<=10&&hasSubject;
+    if(group==='SPOKEN'||group==='HINDI')return hasSubject;
+    if(group==='D')return student.board_name==='CBSE'&&grade===9&&!!subject&&hasSubject;
+    if(group==='E')return student.board_name==='CBSE'&&grade===10&&!!subject&&hasSubject;
+    if(group==='SENIOR')return student.board_name==='CBSE'&&(grade===11||grade===12)&&!!subject&&hasSubject;
+    if(grade>=1&&grade<=8)return !subject;
+    if(grade>=9&&grade<=10)return student.board_name==='State Board'&&!subject;
     return false;
   });
-  rosterRows = matches.map(student=>({...student,attendance_subject:Number(String(student.class_name).replace(/\D/g,''))>=9?subject:''}));
+  rosterRows=matches.map(student=>({...student,attendance_subject:(group==='SPOKEN'||group==='HINDI'||group==='D'||group==='E'||group==='SENIOR'||isTeaching)?subject:''}));
 
   $('roster').innerHTML = rosterRows.length
     ? rosterRows.map(s =>
@@ -1476,6 +1484,20 @@ $('saveRoster').onclick = async () => {
   msg('dashMsg','Student attendance saved successfully.');
 };
 
+/* MONTHLY SECTION-WISE EXCEL EXPORT */
+$('attendanceReportMonth').value=today.slice(0,7);
+$('attendanceReportDownload').onclick=async()=>{
+ const month=$('attendanceReportMonth').value;if(!month)return msg('attendanceReportMsg','Select a month first.',true);
+ if(typeof XLSX==='undefined')return msg('attendanceReportMsg','Excel export library did not load. Refresh and retry.',true);
+ const [year,mm]=month.split('-').map(Number),start=month+'-01',end=new Date(year,mm,0).toISOString().slice(0,10),days=new Date(year,mm,0).getDate();
+ const {data:att,error:attError}=await db.from('attendance').select('student_id,class_name,attendance_date,subject_name,status').gte('attendance_date',start).lte('attendance_date',end);if(attError)return msg('attendanceReportMsg',attError.message,true);
+ const wb=XLSX.utils.book_new();
+ const addSheet=(name,students,kind)=>{const rows=[];(students||[]).forEach(st=>{let subs=[''];if(kind==='spoken')subs=['Spoken English'];if(kind==='hindi')subs=['Hindi'];if(kind==='senior')subs=st.subjects||[];if(kind==='section'&&st.board_name==='CBSE'&&['Class 9','Class 10'].includes(st.class_name))subs=st.subjects||[];subs.forEach(sub=>{const row={'Student Code':st.student_code||'','Student Name':st.full_name,'Class':st.class_name,'Board':st.board_name||'','Section':st.section_name||'','Subject':sub||'—'};let p=0,a=0,l=0;for(let d=1;d<=days;d++){const date=year+'-'+String(mm).padStart(2,'0')+'-'+String(d).padStart(2,'0'),rec=(att||[]).find(x=>x.student_id===st.student_id&&x.attendance_date===date&&(x.subject_name||'')===(sub||''));row[String(d).padStart(2,'0')]=rec?.status||'';if(rec?.status==='Present')p++;if(rec?.status==='Absent')a++;if(rec?.status==='Leave')l++;}row.Present=p;row.Absent=a;row.Leave=l;row['Attendance %']=p+a+l?Math.round(p/(p+a+l)*100)+'%':'—';rows.push(row);});});XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),name.slice(0,31));};
+ for(const sec of ['A','B','C','D','E']){const {data,error}=await db.from('student_roster').select('student_id,full_name,student_code,class_name,board_name,section_name,subjects').eq('active',true).eq('section_name',sec).order('full_name');if(error)return msg('attendanceReportMsg','Section '+sec+': '+error.message,true);addSheet('Section '+sec,data,'section');}
+ for(const [label,kind] of [['Spoken English','spoken'],['Hindi','hindi']]){const {data,error}=await db.from('student_roster').select('student_id,full_name,student_code,class_name,board_name,section_name,subjects').eq('active',true).contains('subjects',[label]).order('full_name');if(error)return msg('attendanceReportMsg',label+': '+error.message,true);addSheet(label,data,kind);}
+ const {data:senior,error:seniorError}=await db.from('student_roster').select('student_id,full_name,student_code,class_name,board_name,section_name,subjects').eq('active',true).eq('board_name','CBSE').in('class_name',['Class 11','Class 12']).order('full_name');if(seniorError)return msg('attendanceReportMsg','CBSE Classes 11–12: '+seniorError.message,true);
+ addSheet('CBSE Class 11',(senior||[]).filter(s=>s.class_name==='Class 11'),'senior');addSheet('CBSE Class 12',(senior||[]).filter(s=>s.class_name==='Class 12'),'senior');XLSX.writeFile(wb,'FSA_Attendance_'+month+'.xlsx');msg('attendanceReportMsg','Monthly Excel downloaded successfully.');
+};
 /* STUDENT DASHBOARD */
 async function loadStudent() {
   const { data: student, error } = await db
