@@ -682,6 +682,18 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             <div class="fee-stat"><span>Balance Pending</span><strong id="feeStatPending">—</strong><small>Estimated outstanding</small></div>
           </div>
           <div class="panel fee-workspace">
+            <h4>Fee Structure Settings</h4>
+            <p class="muted">Select a class and update its standard tuition fee, other fee and default payment plan. Changes apply to fee calculations and future fee assignments; recorded payments remain unchanged.</p>
+            <div class="fields">
+              <div class="field"><label>Class / Fee Category</label><select id="feeStructureClass"><option value="">Select class</option></select></div>
+              <div class="field"><label>Tuition Fee (₹)</label><input id="feeStructureTuition" type="number" min="0" step="0.01" placeholder="Enter tuition fee"></div>
+              <div class="field"><label>Other Fee (₹)</label><input id="feeStructureOther" type="number" min="0" step="0.01" placeholder="Enter other fee"></div>
+              <div class="field"><label>Default Payment Plan</label><select id="feeStructurePayMode"><option>Monthly Pay</option><option>Yearly Pay</option></select></div>
+            </div>
+            <button class="btn" id="feeStructureSave">Save Fee Structure</button>
+            <div id="feeStructureMessage"></div>
+          </div>
+          <div class="panel fee-workspace">
             <h4>Assign Fee to Student</h4>
             <div class="fields">
               <div class="field"><label>Student</label><select id="feeStudentSelect"><option value="">Select student</option></select></div>
@@ -1151,6 +1163,13 @@ async function loadFeeManagement() {
   feeStudents=studentsRes.data||[]; feeClasses=classesRes.data||[]; feeAccounts=accountsRes.data||[]; feePayments=paymentsRes.data||[];
   $('feeStudentSelect').innerHTML='<option value="">Select student</option>'+feeStudents.filter(s=>s.active).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code)+' · '+esc(s.class_name)+'</option>').join('');
   $('feeClassSelect').innerHTML='<option value="">Select fee class</option>'+feeClasses.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.class_name)+' · Tuition ₹'+Number(c.tuition_fee).toLocaleString('en-IN')+' + Other ₹'+Number(c.other_fee).toLocaleString('en-IN')+'</option>').join('');
+  $('feeStructureClass').innerHTML='<option value="">Select class</option>'+feeClasses.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.class_name)+'</option>').join('');
+  $('feeStructureClass').onchange=()=>{
+    const selected=feeClasses.find(c=>c.id===$('feeStructureClass').value);
+    $('feeStructureTuition').value=selected?Number(selected.tuition_fee):'';
+    $('feeStructureOther').value=selected?Number(selected.other_fee):'';
+    $('feeStructurePayMode').value=selected?.default_pay_mode||'Monthly Pay';
+  };
   $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
   const totalCollected=feePayments.reduce((sum,p)=>sum+Number(p.amount||0),0);
   const totalAssigned=feeAccounts.reduce((sum,a)=>{const cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return sum+Math.max(0,Number(cl.tuition_fee||0)+Number(cl.other_fee||0)-Number(a.discount||0));},0);
@@ -1176,6 +1195,26 @@ async function loadFeeManagement() {
   ]);
   showTable('feeDemoPaymentList',['Sample Receipt','Date','Sample ID','Amount','Mode','Reference','Status'],demoPaymentRows);
 }
+$('feeStructureSave').onclick=async()=>{
+  if(!profile||profile.role!=='admin')return;
+  const id=$('feeStructureClass').value;
+  const tuition=Number($('feeStructureTuition').value), other=Number($('feeStructureOther').value);
+  const mode=$('feeStructurePayMode').value;
+  if(!id||$('feeStructureTuition').value===''||$('feeStructureOther').value===''||
+     !Number.isFinite(tuition)||!Number.isFinite(other)||tuition<0||other<0)
+    return msg('feeStructureMessage','Select a class and enter valid non-negative fee amounts.',true);
+  const button=$('feeStructureSave');button.disabled=true;button.textContent='Saving...';
+  const {data,error}=await db.from('fee_class_rates')
+    .update({tuition_fee:tuition,other_fee:other,default_pay_mode:mode,updated_at:new Date().toISOString()})
+    .eq('id',id).select('id').maybeSingle();
+  button.disabled=false;button.textContent='Save Fee Structure';
+  if(error)return msg('feeStructureMessage','Could not update fee structure: '+error.message,true);
+  if(!data)return msg('feeStructureMessage','No fee structure was updated. Check admin database permissions.',true);
+  msg('feeStructureMessage','Fee structure updated successfully. Existing payment entries are unchanged.');
+  await loadFeeManagement();
+  $('feeStructureClass').value=id;$('feeStructureClass').dispatchEvent(new Event('change'));
+};
+$('feeStructureClass').onchange=()=>{};
 $('feeAssignBtn').onclick=async()=>{
   if(!profile||profile.role!=='admin')return;
   const studentId=$('feeStudentSelect').value, feeClassId=$('feeClassSelect').value;
