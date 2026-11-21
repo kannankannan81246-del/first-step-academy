@@ -609,7 +609,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             <p class="muted">A staff member can handle multiple subjects. They will only see senior students who study their assigned subjects.</p>
             <div class="fields">
               <div class="field"><label>Select Staff</label><select id="subjectAssignStaff"></select></div>
-              <div class="field"><label>Subject</label><input id="subjectAssignName" placeholder="e.g. Physics, Biology, Social Science"></div>
+              <div class="field"><label>Subject</label><select id="subjectAssignName"><option value="">Select senior subject</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>Mathematics</option><option>Computer Science</option></select></div>
             </div>
             <button class="btn" id="subjectAssignSave">Assign Subject</button>
             <div id="subjectAssignRecords"></div>
@@ -1586,23 +1586,23 @@ $('saveRoster').onclick = async () => {
   if((group==='D'||group==='E'||group==='SENIOR11'||group==='SENIOR12'||group.startsWith('TEACH:'))&&!subject)
     return msg('dashMsg','Select the subject before saving attendance.',true);
 
-  const rows=rosterRows.map(student=>{
-    const control=$('roster').querySelector('[data-student="'+student.student_id+'"]');
-    if(!control) throw new Error('Attendance status is missing for '+student.full_name+'. Reload the roster and try again.');
-    return {
-      student_id:student.student_id,
-      class_name:student.class_name,
-      attendance_date:date,
-      subject_name:student.attendance_subject || '',
-      status:control.value,
-      marked_by:user.id
-    };
-  });
   const button=$('saveRoster');
   button.disabled=true;
   const originalText=button.textContent;
   button.textContent='Saving attendance…';
   try {
+    const rows=rosterRows.map(student=>{
+      const control=$('roster').querySelector('[data-student="'+student.student_id+'"]');
+      if(!control) throw new Error('Attendance status is missing for '+student.full_name+'. Reload the roster and try again.');
+      return {
+        student_id:student.student_id,
+        class_name:student.class_name,
+        attendance_date:date,
+        subject_name:student.attendance_subject || '',
+        status:control.value,
+        marked_by:user.id
+      };
+    });
     const {data,error}=await db.from('attendance').upsert(rows,{
       onConflict:'student_id,attendance_date,subject_name'
     }).select('student_id');
