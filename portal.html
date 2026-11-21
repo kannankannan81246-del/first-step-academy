@@ -509,10 +509,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
               <input id="adPrevious">
             </div>
 
-            <div class="field full">
-              <label>Address</label>
-              <textarea id="adAddress"></textarea>
-            </div>
           </div>
 
           <button class="btn" id="adSave">Save Admission</button>
@@ -1288,7 +1284,6 @@ $('adSave').onclick = async () => {
     board_name: board,
     section_name: section || null,
     guardian_phone: $('adPhone').value.trim() || null,
-    address: $('adAddress').value.trim() || null,
     subjects,
     admission_date: $('adDate').value || today,
     previous_school: $('adPrevious').value.trim() || null
@@ -1303,7 +1298,7 @@ $('adSave').onclick = async () => {
 
     [
       'adName',
-      'adPhone', 'adAddress', 'adPrevious'
+      'adPhone', 'adPrevious'
     ].forEach(id => $(id).value = '');
     resetAdmissionSubjects();
     $('adCode').value = 'FSA — Generated automatically';
