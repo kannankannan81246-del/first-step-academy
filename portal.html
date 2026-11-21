@@ -728,6 +728,15 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             <h5>Sample Student Fee Records</h5><div id="feeDemoStudentList"></div>
             <h5>Sample Payment History</h5><div id="feeDemoPaymentList"></div>
           </div>
+          <div class="panel fee-workspace">
+            <h4>Monthly Fee Collection Report</h4>
+            <p class="muted">Choose a month to see how much fee was collected, number of payments and student-wise payment details. This report is available only to Admin.</p>
+            <div class="fields"><div class="field"><label>Report Month</label><input id="feeReportMonth" type="month"></div></div>
+            <div id="feeMonthlyReportSummary" class="fee-overview"></div>
+            <div id="feeMonthlyReportTable"></div>
+            <div class="row" style="margin-top:16px"><span class="muted">Download the selected month's collection report as an Excel file.</span><button class="btn" id="feeMonthlyReportDownload">Download Monthly Fee Report (.xlsx)</button></div>
+            <div id="feeMonthlyReportMessage"></div>
+          </div>
           <p class="muted">Fee records are not shown in Staff or Student dashboards. Database access is restricted to authenticated academy admins.</p>
         </div>
         <div class="panel hidden" id="attendanceReports"><h3>Overall Monthly Attendance Report</h3><p class="muted">Admin-only report covering the entire academy. Separate worksheets for Sections A–E, Spoken English, Hindi and CBSE Classes 11–12.</p><div class="fields"><div class="field"><label>Month</label><input id="adminAttendanceReportMonth" type="month"></div></div><button class="btn" id="adminAttendanceReportDownload">Download Overall Excel Report (.xlsx)</button><div id="adminAttendanceReportMsg"></div></div>
@@ -1148,6 +1157,106 @@ function printFeeReceipt(paymentId) {
   body{font-family:Arial,sans-serif;color:#142944;padding:32px}.receipt{max-width:680px;margin:auto;border:2px solid #c5a15b;padding:30px}.top{text-align:center;border-bottom:2px solid #c5a15b;padding-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:7px 0;color:#64748b}.rno{display:flex;justify-content:space-between;margin:22px 0;font-weight:bold}.line{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #e2e8f0;gap:20px}.line span:first-child{color:#64748b}.amount{font-size:21px;font-weight:bold;color:#142944}.foot{text-align:center;margin-top:28px;color:#64748b;font-size:12px}@media print{body{padding:0}.receipt{border:2px solid #c5a15b}}</style></head><body><main class="receipt"><header class="top"><h1>FIRST STEP ACADEMY</h1><p>OFFICIAL FEE PAYMENT RECEIPT</p></header><div class="rno"><span>Receipt No: ${safe(payment.receipt_no)}</span><span>Date: ${safe(payment.payment_date)}</span></div><div class="line"><span>Student Name</span><strong>${safe(student.full_name)}</strong></div><div class="line"><span>Student UID</span><strong>${safe(student.student_code)}</strong></div><div class="line"><span>Class</span><strong>${safe(student.class_name)} ${safe(student.board_name)}</strong></div><div class="line"><span>Fee Category</span><strong>${safe(feeClass.class_name)}</strong></div><div class="line"><span>Payment Mode</span><strong>${safe(payment.payment_mode)}</strong></div><div class="line"><span>Reference / Note</span><strong>${safe(payment.reference)}</strong></div><div class="line"><span>Payment Status</span><strong>${safe(payment.status)}</strong></div><div class="line"><span>Amount Received</span><strong class="amount">₹${Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</strong></div><p class="foot">This is a computer-generated receipt from First Step Academy.</p></main><script>window.onload=()=>window.print();<\/script></body></html>`);
   w.document.close();
 }
+function feeReportMonthBounds(month) {
+  if(!/^\\d{4}-\\d{2}$/.test(month)) throw new Error('Select a valid report month.');
+  const [year,monthNumber]=month.split('-').map(Number);
+  const start=month+'-01';
+  const next=new Date(year,monthNumber,1);
+  const end=next.getFullYear()+'-'+String(next.getMonth()+1).padStart(2,'0')+'-01';
+  return {start,end};
+}
+async function loadMonthlyFeeReport() {
+  if(!profile||profile.role!=='admin') return;
+  const month=$('feeReportMonth').value;
+  if(!month) return msg('feeMonthlyReportMessage','Select a month to view the collection report.',true);
+  const button=$('feeMonthlyReportDownload');
+  if(button) button.disabled=true;
+  try {
+    const {start,end}=feeReportMonthBounds(month);
+    const {data,error}=await db.from('fee_payments')
+      .select('id,account_id,receipt_no,payment_date,amount,payment_mode,reference,status')
+      .gte('payment_date',start).lt('payment_date',end)
+      .order('payment_date',{ascending:true});
+    if(error) throw new Error(error.message);
+    const rows=data||[];
+    const total=rows.reduce((sum,p)=>sum+Number(p.amount||0),0);
+    const studentIds=new Set(rows.map(p=>feeAccounts.find(a=>a.id===p.account_id)?.student_id).filter(Boolean));
+    const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+    $('feeMonthlyReportSummary').innerHTML=[
+      ['Total Fee Collected',money(total)],
+      ['Payments Received',rows.length],
+      ['Students Paid',studentIds.size]
+    ].map(([label,value])=>'<div class="fee-stat"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong></div>').join('');
+    const details=rows.map(p=>{
+      const account=feeAccounts.find(a=>a.id===p.account_id)||{};
+      const student=feeStudents.find(s=>s.id===account.student_id)||{};
+      return [p.receipt_no||'—',p.payment_date,student.student_code||'—',student.full_name||'Student',student.class_name||'—',Number(p.amount||0),p.payment_mode||'—',p.reference||'—',p.status||'—'];
+    });
+    showTable('feeMonthlyReportTable',['Receipt','Date','Student UID','Student','Class','Amount (₹)','Mode','Reference','Status'],details.map(r=>r.map((v,i)=>i===5?money(v):v)));
+    $('feeMonthlyReportDownload').onclick=()=>downloadMonthlyFeeReport(month,rows);
+    msg('feeMonthlyReportMessage',rows.length?'Monthly collection report loaded.':'No fee payments were recorded for this month.');
+    $('feeMonthlyReportMessage').className='notice';
+    window.fsaMonthlyFeeReportRows=rows;
+  } catch(error) {
+    msg('feeMonthlyReportMessage','Monthly report could not load: '+error.message,true);
+    $('feeMonthlyReportSummary').innerHTML='';
+    $('feeMonthlyReportTable').innerHTML='';
+  } finally {
+    if(button) button.disabled=false;
+  }
+}
+function downloadMonthlyFeeReport(month,payments) {
+  if(profile?.role!=='admin') return msg('feeMonthlyReportMessage','Admin permission is required.',true);
+  if(typeof XLSX==='undefined') return msg('feeMonthlyReportMessage','Excel export library did not load. Refresh and retry.',true);
+  try {
+    const rows=payments||[];
+    const money=n=>Number(n||0);
+    const details=rows.map(p=>{
+      const account=feeAccounts.find(a=>a.id===p.account_id)||{};
+      const student=feeStudents.find(s=>s.id===account.student_id)||{};
+      return [p.receipt_no||'',p.payment_date||'',student.student_code||'',student.full_name||'Student',student.class_name||'',money(p.amount),p.payment_mode||'',p.reference||'',p.status||''];
+    });
+    const total=rows.reduce((sum,p)=>sum+money(p.amount),0);
+    const wb=XLSX.utils.book_new();
+    const summary=XLSX.utils.aoa_to_sheet([
+      ['FIRST STEP ACADEMY'],
+      ['MONTHLY FEE COLLECTION REPORT',month],
+      ['Total Fee Collected (₹)',total],
+      ['Number of Payments',rows.length],
+      ['Students Paid',new Set(rows.map(p=>feeAccounts.find(a=>a.id===p.account_id)?.student_id).filter(Boolean)).size],
+      [],
+      ['Payment Mode','Total Collected (₹)'],
+      ...[...new Set(rows.map(p=>p.payment_mode||'Other'))].sort().map(mode=>[mode,rows.filter(p=>(p.payment_mode||'Other')===mode).reduce((sum,p)=>sum+money(p.amount),0)])
+    ]);
+    summary['!cols']=[{wch:30},{wch:24}];
+    summary['!merges']=[{s:{r:0,c:0},e:{r:0,c:1}},{s:{r:1,c:0},e:{r:1,c:1}}];
+    const detail=XLSX.utils.aoa_to_sheet([
+      ['FIRST STEP ACADEMY'],
+      ['MONTHLY PAYMENT DETAILS',month],
+      ['Receipt','Payment Date','Student UID','Student Name','Class','Amount (₹)','Payment Mode','Reference / Note','Status'],
+      ...details
+    ]);
+    detail['!cols']=[{wch:18},{wch:15},{wch:14},{wch:26},{wch:16},{wch:16},{wch:18},{wch:28},{wch:14}];
+    detail['!freeze']={xSplit:0,ySplit:3};
+    detail['!autofilter']={ref:'A3:I'+Math.max(3,details.length)};
+    const style=(ws,range,sty)=>{for(let r=range.s.r;r<=range.e.r;r++)for(let col=range.s.c;col<=range.e.c;col++){const cell=ws[XLSX.utils.encode_cell({r,c:col})];if(cell)cell.s=sty;}};
+    const titleStyle={fill:{fgColor:{rgb:'102541'}},font:{name:'Aptos Display',sz:18,bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center'}};
+    const subStyle={fill:{fgColor:{rgb:'DCE6F1'}},font:{name:'Aptos',sz:11,bold:true,color:{rgb:'102541'}}};
+    const headStyle={fill:{fgColor:{rgb:'B58A3A'}},font:{name:'Aptos',bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',wrapText:true}};
+    style(summary,{s:{r:0,c:0},e:{r:0,c:1}},titleStyle);
+    style(summary,{s:{r:1,c:0},e:{r:1,c:1}},subStyle);
+    style(summary,{s:{r:6,c:0},e:{r:6,c:1}},headStyle);
+    style(detail,{s:{r:0,c:0},e:{r:0,c:8}},titleStyle);
+    style(detail,{s:{r:1,c:0},e:{r:1,c:8}},subStyle);
+    style(detail,{s:{r:2,c:0},e:{r:2,c:8}},headStyle);
+    XLSX.utils.book_append_sheet(wb,summary,'Monthly Summary');
+    XLSX.utils.book_append_sheet(wb,detail,'Payment Details');
+    XLSX.writeFile(wb,'FSA_Monthly_Fee_Collection_'+month+'.xlsx');
+    msg('feeMonthlyReportMessage','Monthly fee collection Excel report downloaded.');
+  } catch(error) {
+    msg('feeMonthlyReportMessage','Excel report could not be generated: '+error.message,true);
+  }
+}
 async function loadFeeManagement() {
   if (!profile || profile.role !== 'admin') return;
   const [studentsRes,classesRes,accountsRes,paymentsRes,demoStudentsRes,demoPaymentsRes]=await Promise.all([
@@ -1170,6 +1279,10 @@ async function loadFeeManagement() {
     $('feeStructureOther').value=selected?Number(selected.other_fee):'';
     $('feeStructurePayMode').value=selected?.default_pay_mode||'Monthly Pay';
   };
+  const reportMonth=new Date().toISOString().slice(0,7);
+  if(!$('feeReportMonth').value) $('feeReportMonth').value=reportMonth;
+  $('feeReportMonth').onchange=loadMonthlyFeeReport;
+  $('feeMonthlyReportDownload').onclick=()=>downloadMonthlyFeeReport($('feeReportMonth').value,window.fsaMonthlyFeeReportRows||[]);
   $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
   const totalCollected=feePayments.reduce((sum,p)=>sum+Number(p.amount||0),0);
   const totalAssigned=feeAccounts.reduce((sum,a)=>{const cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return sum+Math.max(0,Number(cl.tuition_fee||0)+Number(cl.other_fee||0)-Number(a.discount||0));},0);
@@ -1194,6 +1307,7 @@ async function loadFeeManagement() {
     '₹'+Number(p.amount).toLocaleString('en-IN'),p.payment_mode,p.reference||'—',p.status
   ]);
   showTable('feeDemoPaymentList',['Sample Receipt','Date','Sample ID','Amount','Mode','Reference','Status'],demoPaymentRows);
+  await loadMonthlyFeeReport();
 }
 $('feeStructureSave').onclick=async()=>{
   if(!profile||profile.role!=='admin')return;
