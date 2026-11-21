@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Academy Portal | First Step Academy</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
 <style>
 :root {
@@ -710,7 +710,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
           <p class="muted">Fee records are not shown in Staff or Student dashboards. Database access is restricted to authenticated academy admins.</p>
         </div>
-        <div class="panel hidden" id="attendanceReports"><h3>Monthly Attendance Reports</h3><p class="muted">Download the full academy report with separate worksheets for Sections A–E, Spoken English, Hindi and CBSE Classes 11–12.</p><div class="fields"><div class="field"><label>Month</label><input id="adminAttendanceReportMonth" type="month"></div></div><button class="btn" id="adminAttendanceReportDownload">Download Full Monthly Excel (.xlsx)</button><div id="adminAttendanceReportMsg"></div></div>
+        <div class="panel hidden" id="attendanceReports"><h3>Overall Monthly Attendance Report</h3><p class="muted">Admin-only report covering the entire academy. Separate worksheets for Sections A–E, Spoken English, Hindi and CBSE Classes 11–12.</p><div class="fields"><div class="field"><label>Month</label><input id="adminAttendanceReportMonth" type="month"></div></div><button class="btn" id="adminAttendanceReportDownload">Download Overall Excel Report (.xlsx)</button><div id="adminAttendanceReportMsg"></div></div>
         </div>
       </div>
 
@@ -744,7 +744,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 
           <button class="btn" id="saveRoster">Save Student Attendance</button>
         </div>
-        <div class="panel"><h3>Monthly Attendance Excel</h3><p class="muted">Separate worksheets for Sections A–E, Spoken English, Hindi, CBSE Class 11 and CBSE Class 12.</p><div class="fields"><div class="field"><label>Month</label><input id="attendanceReportMonth" type="month"></div></div><button class="btn secondary" id="attendanceReportDownload">Download Monthly Excel (.xlsx)</button><div id="attendanceReportMsg"></div></div>
+        <div class="panel"><h3>My Classes – Monthly Attendance Report</h3><p class="muted">Your Excel file includes only the sections, classes and subjects assigned to your staff account.</p><div class="fields"><div class="field"><label>Month</label><input id="attendanceReportMonth" type="month"></div></div><button class="btn secondary" id="attendanceReportDownload">Download My Class Report (.xlsx)</button><div id="attendanceReportMsg"></div></div>
         <div class="panel">
           <h3>Upload Gallery Photo</h3>
           <p class="muted">Your photo will be sent to the admin for approval before appearing publicly.</p>
@@ -1576,24 +1576,206 @@ $('saveRoster').onclick = async () => {
   msg('dashMsg','Student attendance saved successfully.');
 };
 
-/* MONTHLY SECTION-WISE EXCEL EXPORT */
+/* MONTHLY ATTENDANCE EXCEL EXPORT — ADMIN OVERALL / STAFF ASSIGNED CLASSES */
 $('attendanceReportMonth').value=today.slice(0,7);
 $('adminAttendanceReportMonth').value=today.slice(0,7);
-$('adminAttendanceReportDownload').onclick=()=>{const m=$('adminAttendanceReportMonth').value;if(!m)return msg('adminAttendanceReportMsg','Select a month first.',true);$('attendanceReportMonth').value=m;$('attendanceReportDownload').click();msg('adminAttendanceReportMsg','Your full monthly Excel report is being prepared.');};
-$('attendanceReportDownload').onclick=async()=>{
- const month=$('attendanceReportMonth').value;if(!month)return msg('attendanceReportMsg','Select a month first.',true);
- if(typeof XLSX==='undefined')return msg('attendanceReportMsg','Excel export library did not load. Refresh and retry.',true);
- const [year,mm]=month.split('-').map(Number),days=new Date(year,mm,0).getDate(),start=month+'-01',end=year+'-'+String(mm).padStart(2,'0')+'-'+String(days).padStart(2,'0');
- const {data:att,error:attError}=await db.from('attendance').select('student_id,class_name,attendance_date,subject_name,status').gte('attendance_date',start).lte('attendance_date',end);if(attError)return msg('attendanceReportMsg',attError.message,true);
- const wb=XLSX.utils.book_new();
- const addSheet=(name,students,kind)=>{const rows=[];(students||[]).forEach(st=>{let subs=[''];if(kind==='spoken')subs=['Spoken English'];if(kind==='hindi')subs=['Hindi'];if(kind==='senior')subs=st.subjects||[];if(kind==='section'&&st.board_name==='CBSE'&&['Class 9','Class 10'].includes(st.class_name))subs=st.subjects||[];subs.forEach(sub=>{const row={'Student Name':st.full_name,'Class':st.class_name,'Board':st.board_name||'','Section':st.section_name||'','Subject':sub||'—'};let p=0,a=0,l=0;for(let d=1;d<=days;d++){const date=year+'-'+String(mm).padStart(2,'0')+'-'+String(d).padStart(2,'0'),rec=(att||[]).find(x=>x.student_id===st.student_id&&x.attendance_date===date&&(x.subject_name||'')===(sub||''));row[String(d).padStart(2,'0')]=rec?.status||'';if(rec?.status==='Present')p++;if(rec?.status==='Absent')a++;if(rec?.status==='Leave')l++;}row.Present=p;row.Absent=a;row.Leave=l;row['Attendance %']=p+a+l?Math.round(p/(p+a+l)*100)+'%':'—';rows.push(row);});});XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),name.slice(0,31));};
- for(const sec of ['A','B','C','D','E']){const {data,error}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).eq('section_name',sec).order('full_name');if(error)return msg('attendanceReportMsg','Section '+sec+': '+error.message,true);addSheet('Section '+sec,data,'section');}
- for(const [label,kind] of [['Spoken English','spoken'],['Hindi','hindi']]){const {data,error}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).contains('subjects',[label]).order('full_name');if(error)return msg('attendanceReportMsg',label+': '+error.message,true);addSheet(label,data,kind);}
- const {data:assignedSubjectRows,error:assignedSubjectError}=await db.from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id);if(assignedSubjectError)return msg('attendanceReportMsg',assignedSubjectError.message,true);const seniorSubjects=(assignedSubjectRows||[]).map(x=>x.subject_name);
- const {data:senior,error:seniorError}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).eq('board_name','CBSE').in('class_name',['Class 11','Class 12']).order('full_name');if(seniorError)return msg('attendanceReportMsg','CBSE Classes 11–12: '+seniorError.message,true);
- const seniorRows=profile?.role==='admin'?(senior||[]):(senior||[]).map(s=>({...s,subjects:(s.subjects||[]).filter(sub=>seniorSubjects.some(assigned=>assigned.toLowerCase()===sub.toLowerCase()))}));
- addSheet('CBSE Class 11',seniorRows.filter(s=>s.class_name==='Class 11'),'senior');addSheet('CBSE Class 12',seniorRows.filter(s=>s.class_name==='Class 12'),'senior');XLSX.writeFile(wb,'FSA_Attendance_'+month+'.xlsx');msg('attendanceReportMsg','Monthly Excel downloaded successfully.');
-};
+
+function attendanceExcelStyle(cell, style) {
+  cell.s = style;
+}
+function attendanceExcelStatusStyle(status) {
+  if(status==='Present') return {fill:{fgColor:{rgb:'E2F0D9'}},font:{color:{rgb:'276221'},bold:true},alignment:{horizontal:'center'}};
+  if(status==='Absent') return {fill:{fgColor:{rgb:'FCE4D6'}},font:{color:{rgb:'9C0006'},bold:true},alignment:{horizontal:'center'}};
+  if(status==='Leave') return {fill:{fgColor:{rgb:'FFF2CC'}},font:{color:{rgb:'7F6000'},bold:true},alignment:{horizontal:'center'}};
+  return {alignment:{horizontal:'center'},font:{color:{rgb:'A6A6A6'}}};
+}
+function attendanceAddExcelSheet(wb, sheetName, students, kind, month, attendanceRows) {
+  const parts=month.split('-').map(Number), year=parts[0], mm=parts[1];
+  const days=new Date(year,mm,0).getDate();
+  const dayHeaders=Array.from({length:days},(_,i)=>String(i+1).padStart(2,'0'));
+  const headers=['Student Name','Class','Board','Section','Subject'].concat(dayHeaders,['Present','Absent','Leave','Attendance %']);
+  const rows=[];
+  const byKey=new Map();
+  (attendanceRows||[]).forEach(rec=>byKey.set(rec.student_id+'|'+rec.attendance_date+'|'+(rec.subject_name||''),rec));
+  (students||[]).forEach(st=>{
+    let subjects=[''];
+    if(kind==='spoken') subjects=['Spoken English'];
+    if(kind==='hindi') subjects=['Hindi'];
+    if(kind==='senior') subjects=(st.report_subjects||st.subjects||[]);
+    if(kind==='teaching') subjects=[st.report_subject||''];
+    if(kind==='section'&&st.board_name==='CBSE'&&['Class 9','Class 10'].includes(st.class_name)) subjects=st.subjects||[];
+    subjects.forEach(subject=>{
+      const row=[st.full_name||'',st.class_name||'',st.board_name||'',st.section_name||'',subject||'—'];
+      let present=0,absent=0,leave=0,recorded=0;
+      for(let d=1;d<=days;d++){
+        const date=year+'-'+String(mm).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const rec=byKey.get(st.student_id+'|'+date+'|'+(subject||''));
+        const status=rec?rec.status:'';
+        row.push(status);
+        if(status==='Present'){present++;recorded++;}
+        else if(status==='Absent'){absent++;recorded++;}
+        else if(status==='Leave'){leave++;recorded++;}
+      }
+      row.push(present,absent,leave,recorded?Math.round(present/recorded*100)+'%':'—');
+      rows.push(row);
+    });
+  });
+  const totalCols=headers.length;
+  const titleRow=['FIRST STEP ACADEMY'];
+  const subtitleRow=['MONTHLY ATTENDANCE REPORT  |  '+month+'  |  '+sheetName];
+  const noteRow=['Present: Green   •   Absent: Red   •   Leave: Gold'];
+  const aoa=[titleRow,subtitleRow,noteRow,headers].concat(rows);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:totalCols-1}},{s:{r:1,c:0},e:{r:1,c:totalCols-1}},{s:{r:2,c:0},e:{r:2,c:totalCols-1}}];
+  ws['!cols']=[
+    {wch:25},{wch:13},{wch:14},{wch:11},{wch:20},
+    ...dayHeaders.map(()=>({wch:8})),
+    {wch:11},{wch:11},{wch:11},{wch:14}
+  ];
+  ws['!rows']=[{hpt:30},{hpt:22},{hpt:19},{hpt:28},...rows.map(()=>({hpt:22}))];
+  ws['!freeze']={xSplit:5,ySplit:4};
+  ws['!autofilter']={ref:'A4:'+XLSX.utils.encode_col(totalCols-1)+(rows.length+4)};
+  ws['!pageSetup']={orientation:'landscape',fitToWidth:1,fitToHeight:0};
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  for(let c=0;c<totalCols;c++){
+    const cell=ws[XLSX.utils.encode_cell({r:0,c})];
+    if(cell) attendanceExcelStyle(cell,{fill:{fgColor:{rgb:'102541'}},font:{name:'Aptos Display',sz:18,bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',vertical:'center'}});
+    const sub=ws[XLSX.utils.encode_cell({r:1,c})];
+    if(sub) attendanceExcelStyle(sub,{fill:{fgColor:{rgb:'DCE6F1'}},font:{name:'Aptos',sz:11,bold:true,color:{rgb:'102541'}},alignment:{horizontal:'center',vertical:'center'}});
+    const note=ws[XLSX.utils.encode_cell({r:2,c})];
+    if(note) attendanceExcelStyle(note,{fill:{fgColor:{rgb:'F7F2E8'}},font:{name:'Aptos',sz:9,italic:true,color:{rgb:'72551E'}},alignment:{horizontal:'left',vertical:'center'}});
+    const head=ws[XLSX.utils.encode_cell({r:3,c})];
+    if(head) attendanceExcelStyle(head,{fill:{fgColor:{rgb:'B58A3A'}},font:{name:'Aptos',sz:10,bold:true,color:{rgb:'FFFFFF'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border:{bottom:{style:'medium',color:{rgb:'102541'}}}});
+  }
+  for(let r=4;r<=range.e.r;r++){
+    for(let c=0;c<totalCols;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(!cell) continue;
+      if(c>=5&&c<5+days){
+        attendanceExcelStyle(cell,attendanceExcelStatusStyle(cell.v));
+      } else {
+        attendanceExcelStyle(cell,{font:{name:'Aptos',sz:10,color:{rgb:'243247'}},alignment:{vertical:'center',horizontal:c>=5?'center':'left'},border:{bottom:{style:'hair',color:{rgb:'E4EAF0'}}},fill:{fgColor:{rgb:r%2===0?'F5F8FB':'FFFFFF'}}});
+      }
+    }
+  }
+  const sheet=sheetName.slice(0,31);
+  XLSX.utils.book_append_sheet(wb,ws,sheet);
+}
+async function fetchAttendanceForMonth(month, studentIds, isAdmin, messageId) {
+  const [year,mm]=month.split('-').map(Number);
+  const start=month+'-01';
+  const end=year+'-'+String(mm).padStart(2,'0')+'-'+String(new Date(year,mm,0).getDate()).padStart(2,'0');
+  let query=db.from('attendance').select('student_id,class_name,attendance_date,subject_name,status').gte('attendance_date',start).lte('attendance_date',end);
+  if(!isAdmin){
+    const ids=[...new Set(studentIds||[])];
+    if(!ids.length) return [];
+    query=query.in('student_id',ids);
+  }
+  const {data,error}=await query;
+  if(error) throw new Error(error.message);
+  return data||[];
+}
+async function downloadAdminOverallAttendanceReport() {
+  const month=$('adminAttendanceReportMonth').value;
+  if(!month)return msg('adminAttendanceReportMsg','Select a month first.',true);
+  if(profile?.role!=='admin')return msg('adminAttendanceReportMsg','Admin permission is required for the overall report.',true);
+  if(typeof XLSX==='undefined')return msg('adminAttendanceReportMsg','Excel export library did not load. Refresh and retry.',true);
+  const button=$('adminAttendanceReportDownload');
+  button.disabled=true;
+  try{
+    const wb=XLSX.utils.book_new();
+    const [attResult,sectionResult,spokenResult,hindiResult,seniorResult]=await Promise.all([
+      fetchAttendanceForMonth(month,[],true),
+      db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).in('section_name',['A','B','C','D','E']).order('full_name'),
+      db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).contains('subjects',['Spoken English']).order('full_name'),
+      db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).contains('subjects',['Hindi']).order('full_name'),
+      db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).eq('board_name','CBSE').in('class_name',['Class 11','Class 12']).order('full_name')
+    ]);
+    if(sectionResult.error)throw new Error('Sections: '+sectionResult.error.message);
+    if(spokenResult.error)throw new Error('Spoken English: '+spokenResult.error.message);
+    if(hindiResult.error)throw new Error('Hindi: '+hindiResult.error.message);
+    if(seniorResult.error)throw new Error('CBSE Classes 11–12: '+seniorResult.error.message);
+    const att=attResult;
+    const sections=sectionResult.data||[];
+    const spoken=spokenResult.data||[];
+    const hindi=hindiResult.data||[];
+    const senior=seniorResult.data||[];
+    for(const sec of ['A','B','C','D','E'])attendanceAddExcelSheet(wb,'Section '+sec,sections.filter(s=>s.section_name===sec),'section',month,att);
+    attendanceAddExcelSheet(wb,'Spoken English',spoken,'spoken',month,att);
+    attendanceAddExcelSheet(wb,'Hindi',hindi,'hindi',month,att);
+    attendanceAddExcelSheet(wb,'CBSE Class 11',senior.filter(s=>s.class_name==='Class 11'),'senior',month,att);
+    attendanceAddExcelSheet(wb,'CBSE Class 12',senior.filter(s=>s.class_name==='Class 12'),'senior',month,att);
+    XLSX.writeFile(wb,'FSA_Overall_Attendance_'+month+'.xlsx');
+    msg('adminAttendanceReportMsg','Overall monthly Excel report downloaded successfully.');
+  }catch(error){msg('adminAttendanceReportMsg','Report could not be generated: '+error.message,true);}
+  finally{button.disabled=false;}
+}
+async function downloadStaffAssignedAttendanceReport() {
+  const month=$('attendanceReportMonth').value;
+  if(!month)return msg('attendanceReportMsg','Select a month first.',true);
+  if(profile?.role!=='staff')return msg('attendanceReportMsg','Staff permission is required for this report.',true);
+  if(typeof XLSX==='undefined')return msg('attendanceReportMsg','Excel export library did not load. Refresh and retry.',true);
+  const button=$('attendanceReportDownload');
+  button.disabled=true;
+  try{
+    const [sectionAssignmentResult,teachingAssignmentResult,subjectAssignmentResult]=await Promise.all([
+      db.from('staff_class_assignments').select('class_name').eq('staff_id',user.id),
+      db.from('staff_teaching_assignments').select('id,board_name,section_name,class_name,subject_name').eq('staff_id',user.id),
+      db.from('staff_subject_assignments').select('subject_name').eq('staff_id',user.id)
+    ]);
+    if(sectionAssignmentResult.error)throw new Error(sectionAssignmentResult.error.message);
+    if(teachingAssignmentResult.error)throw new Error(teachingAssignmentResult.error.message);
+    if(subjectAssignmentResult.error)throw new Error(subjectAssignmentResult.error.message);
+    const sections=[...new Set((sectionAssignmentResult.data||[]).map(x=>String(x.class_name||'').replace(/^Section\s+/i,'')).filter(x=>/^[A-E]$/.test(x)))];
+    const teachingAssignments=teachingAssignmentResult.data||[];
+    const seniorSubjects=[...new Set((subjectAssignmentResult.data||[]).map(x=>x.subject_name).filter(Boolean))];
+    const wb=XLSX.utils.book_new();
+    const scopeRoster=[];
+    const attendanceSheets=[];
+    if(sections.length){
+      const {data,error}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).in('section_name',sections).order('full_name');
+      if(error)throw new Error('Assigned sections: '+error.message);
+      const sectionRows=data||[];
+      scopeRoster.push(...sectionRows);
+      sections.forEach(sec=>attendanceSheets.push({name:'Section '+sec,students:sectionRows.filter(s=>s.section_name===sec),kind:'section'}));
+    }
+    for(const assignment of teachingAssignments){
+      const {data,error}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).eq('board_name',assignment.board_name).eq('section_name',assignment.section_name).eq('class_name',assignment.class_name).order('full_name');
+      if(error)throw new Error(assignment.class_name+' '+assignment.subject_name+': '+error.message);
+      const matched=(data||[]).filter(s=>(s.subjects||[]).some(sub=>String(sub).toLowerCase()===String(assignment.subject_name).toLowerCase()));
+      scopeRoster.push(...matched);
+      attendanceSheets.push({name:assignment.class_name+' '+assignment.subject_name,students:matched.map(s=>({...s,report_subject:assignment.subject_name})),kind:'teaching'});
+    }
+    if(seniorSubjects.length){
+      const {data,error}=await db.from('student_roster').select('student_id,full_name,class_name,board_name,section_name,subjects').eq('active',true).eq('board_name','CBSE').in('class_name',['Class 11','Class 12']).order('full_name');
+      if(error)throw new Error('Assigned senior classes: '+error.message);
+      const seniorRows=(data||[]).map(s=>({...s,report_subjects:(s.subjects||[]).filter(sub=>seniorSubjects.some(assigned=>assigned.toLowerCase()===String(sub).toLowerCase()))})).filter(s=>s.report_subjects.length);
+      scopeRoster.push(...seniorRows);
+      attendanceSheets.push({name:'CBSE Class 11',students:seniorRows.filter(s=>s.class_name==='Class 11'),'kind':'senior'});
+      attendanceSheets.push({name:'CBSE Class 12',students:seniorRows.filter(s=>s.class_name==='Class 12'),'kind':'senior'});
+    }
+    const uniqueRoster=[...new Map(scopeRoster.map(s=>[s.student_id,s])).values()];
+    if(!uniqueRoster.length||!attendanceSheets.length)throw new Error('No assigned classes or students were found for this staff account. Please contact the admin.');
+    const spoken=uniqueRoster.filter(s=>(s.subjects||[]).some(x=>String(x).toLowerCase()==='spoken english'));
+    const hindi=uniqueRoster.filter(s=>(s.subjects||[]).some(x=>String(x).toLowerCase()==='hindi'));
+    if(spoken.length)attendanceSheets.push({name:'Spoken English',students:spoken,kind:'spoken'});
+    if(hindi.length)attendanceSheets.push({name:'Hindi',students:hindi,kind:'hindi'});
+    const att=await fetchAttendanceForMonth(month,uniqueRoster.map(s=>s.student_id),false);
+    const usedNames=new Set();
+    attendanceSheets.forEach((sheet,index)=>{
+      let name=sheet.name.slice(0,31),suffix=2;
+      while(usedNames.has(name)){const tail=' '+suffix++;name=sheet.name.slice(0,31-tail.length)+tail;}
+      usedNames.add(name);
+      attendanceAddExcelSheet(wb,name,sheet.students,sheet.kind,month,att);
+    });
+    XLSX.writeFile(wb,'FSA_My_Classes_Attendance_'+month+'.xlsx');
+    msg('attendanceReportMsg','Your assigned-class monthly Excel report downloaded successfully.');
+  }catch(error){msg('attendanceReportMsg','Report could not be generated: '+error.message,true);}
+  finally{button.disabled=false;}
+}
+$('adminAttendanceReportDownload').onclick=downloadAdminOverallAttendanceReport;
+$('attendanceReportDownload').onclick=downloadStaffAssignedAttendanceReport;
+
 /* STUDENT DASHBOARD */
 async function loadStudent() {
   const { data: student, error } = await db
