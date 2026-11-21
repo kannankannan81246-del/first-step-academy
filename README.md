@@ -15,7 +15,7 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 - Admin admissions and student board/section management
 - Staff attendance and student attendance
 - Subject-based attendance for Classes 9–12
-- One staff member per section and one section per staff member
+- Section-based staff assignments, plus additional cross-section class-and-subject assignments for Classes 9–10 with weekday scheduling (e.g. CBSE Section D Social Science)
 - Subject-specific access for Classes 11–12
 - Student and staff dashboards, class attendance, admin-only RFID IN/OUT attendance, notices, achievements and gallery
 - Notices and student achievements
@@ -44,6 +44,7 @@ For an existing project that already has the portal tables:
 - `supabase/cms-gallery-migration.sql` creates the CMS table, gallery table, storage bucket and related policies.
 - `supabase/subject-attendance-migration.sql` adds subject-based attendance and senior roster access to an existing portal setup.
 - `supabase/fee-rfid-admin-migration.sql` safely adds the fee and RFID tables plus isolated admin-only demo fee records to an existing portal project. It does not import sample students into `public.students` or sample payments into the live payment ledger.
+- `supabase/cross-section-subject-assignments.sql` adds admin-managed cross-section class/subject timetable assignments and matching staff roster/attendance access rules.
 
 The SQL scripts are idempotent where practical, but always take a backup before applying schema or policy changes to a live project.
 
