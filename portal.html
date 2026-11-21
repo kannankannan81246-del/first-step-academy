@@ -683,7 +683,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           </div>
           <div class="panel fee-workspace">
             <h4>Fee Structure Settings</h4>
-            <p class="muted">Select a class and update its standard tuition fee, other fee and default payment plan. Changes apply to fee calculations and future fee assignments; recorded payments remain unchanged.</p>
+            <p class="muted">Select a class and update its standard tuition fee, other fee and default payment plan. Changes update the standard fee for this class and fee totals for accounts linked to it. Recorded payment entries remain unchanged.</p>
             <div class="fields">
               <div class="field"><label>Class / Fee Category</label><select id="feeStructureClass"><option value="">Select class</option></select></div>
               <div class="field"><label>Tuition Fee (₹)</label><input id="feeStructureTuition" type="number" min="0" step="0.01" placeholder="Enter tuition fee"></div>
@@ -1214,7 +1214,6 @@ $('feeStructureSave').onclick=async()=>{
   await loadFeeManagement();
   $('feeStructureClass').value=id;$('feeStructureClass').dispatchEvent(new Event('change'));
 };
-$('feeStructureClass').onchange=()=>{};
 $('feeAssignBtn').onclick=async()=>{
   if(!profile||profile.role!=='admin')return;
   const studentId=$('feeStudentSelect').value, feeClassId=$('feeClassSelect').value;
