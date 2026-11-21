@@ -420,9 +420,9 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             </div>
 
             <div class="field">
-              <label>Student Code <span class="auto-tag">AUTO</span></label>
+              <label>Student UID <span class="auto-tag">AUTO</span></label>
               <input id="adCode" value="FSA — Generated automatically" readonly aria-readonly="true">
-              <small class="muted">A unique FSA code is assigned when the admission is saved.</small>
+              <small class="muted">A permanent UID such as FSA001 is generated automatically when the admission is saved.</small>
             </div>
 
             <div class="field">
@@ -651,7 +651,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <div class="panel" style="background:#f7faff">
             <h4>Scan RFID Card</h4>
             <div class="fields">
-              <div class="field full"><label>RFID UID / Student Code</label><input id="rfidScanInput" autocomplete="off" placeholder="Scan card here and press Enter"></div>
+              <div class="field full"><label>RFID UID / Student UID</label><input id="rfidScanInput" autocomplete="off" placeholder="Scan card here and press Enter"></div>
             </div>
             <div class="row"><button class="btn" id="rfidManualBtn">Record Manual Scan</button><button class="btn secondary" id="rfidFocusBtn">Focus Scanner</button><button class="btn secondary" id="rfidRefreshBtn">Refresh Records</button></div>
             <div id="rfidMessage" class="notice" style="margin-top:12px">Waiting for RFID scan…</div>
@@ -1133,7 +1133,7 @@ function printFeeReceipt(paymentId) {
   const w=window.open('','_blank','width=760,height=850');
   if(!w) return msg('feePaymentMessage','Please allow pop-ups to print the receipt.',true);
   w.document.write(`<!doctype html><html><head><title>Fee Receipt ${safe(payment.receipt_no)}</title><meta charset="utf-8"><style>
-  body{font-family:Arial,sans-serif;color:#142944;padding:32px}.receipt{max-width:680px;margin:auto;border:2px solid #c5a15b;padding:30px}.top{text-align:center;border-bottom:2px solid #c5a15b;padding-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:7px 0;color:#64748b}.rno{display:flex;justify-content:space-between;margin:22px 0;font-weight:bold}.line{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #e2e8f0;gap:20px}.line span:first-child{color:#64748b}.amount{font-size:21px;font-weight:bold;color:#142944}.foot{text-align:center;margin-top:28px;color:#64748b;font-size:12px}@media print{body{padding:0}.receipt{border:2px solid #c5a15b}}</style></head><body><main class="receipt"><header class="top"><h1>FIRST STEP ACADEMY</h1><p>OFFICIAL FEE PAYMENT RECEIPT</p></header><div class="rno"><span>Receipt No: ${safe(payment.receipt_no)}</span><span>Date: ${safe(payment.payment_date)}</span></div><div class="line"><span>Student Name</span><strong>${safe(student.full_name)}</strong></div><div class="line"><span>Student Code</span><strong>${safe(student.student_code)}</strong></div><div class="line"><span>Class</span><strong>${safe(student.class_name)} ${safe(student.board_name)}</strong></div><div class="line"><span>Fee Category</span><strong>${safe(feeClass.class_name)}</strong></div><div class="line"><span>Payment Mode</span><strong>${safe(payment.payment_mode)}</strong></div><div class="line"><span>Reference / Note</span><strong>${safe(payment.reference)}</strong></div><div class="line"><span>Payment Status</span><strong>${safe(payment.status)}</strong></div><div class="line"><span>Amount Received</span><strong class="amount">₹${Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</strong></div><p class="foot">This is a computer-generated receipt from First Step Academy.</p></main><script>window.onload=()=>window.print();<\/script></body></html>`);
+  body{font-family:Arial,sans-serif;color:#142944;padding:32px}.receipt{max-width:680px;margin:auto;border:2px solid #c5a15b;padding:30px}.top{text-align:center;border-bottom:2px solid #c5a15b;padding-bottom:18px}.top h1{margin:0;font-size:25px}.top p{margin:7px 0;color:#64748b}.rno{display:flex;justify-content:space-between;margin:22px 0;font-weight:bold}.line{display:flex;justify-content:space-between;padding:13px 0;border-bottom:1px solid #e2e8f0;gap:20px}.line span:first-child{color:#64748b}.amount{font-size:21px;font-weight:bold;color:#142944}.foot{text-align:center;margin-top:28px;color:#64748b;font-size:12px}@media print{body{padding:0}.receipt{border:2px solid #c5a15b}}</style></head><body><main class="receipt"><header class="top"><h1>FIRST STEP ACADEMY</h1><p>OFFICIAL FEE PAYMENT RECEIPT</p></header><div class="rno"><span>Receipt No: ${safe(payment.receipt_no)}</span><span>Date: ${safe(payment.payment_date)}</span></div><div class="line"><span>Student Name</span><strong>${safe(student.full_name)}</strong></div><div class="line"><span>Student UID</span><strong>${safe(student.student_code)}</strong></div><div class="line"><span>Class</span><strong>${safe(student.class_name)} ${safe(student.board_name)}</strong></div><div class="line"><span>Fee Category</span><strong>${safe(feeClass.class_name)}</strong></div><div class="line"><span>Payment Mode</span><strong>${safe(payment.payment_mode)}</strong></div><div class="line"><span>Reference / Note</span><strong>${safe(payment.reference)}</strong></div><div class="line"><span>Payment Status</span><strong>${safe(payment.status)}</strong></div><div class="line"><span>Amount Received</span><strong class="amount">₹${Number(payment.amount).toLocaleString('en-IN',{minimumFractionDigits:2})}</strong></div><p class="foot">This is a computer-generated receipt from First Step Academy.</p></main><script>window.onload=()=>window.print();<\/script></body></html>`);
   w.document.close();
 }
 async function loadFeeManagement() {
@@ -1836,7 +1836,7 @@ async function loadStudent() {
   }
 
   $('studentProfile').innerHTML = [
-    ['Student Name',student.full_name],['Student Code',student.student_code],
+    ['Student Name',student.full_name],['Student UID',student.student_code],
     ['Class',student.class_name],['Board',student.board_name||'—'],
     ['Section',student.section_name?'Section '+student.section_name:'—']
   ].map(x=>'<div class="stat"><span>'+esc(x[0])+'</span><b style="font-size:1.05rem">'+esc(x[1])+'</b></div>').join('');
