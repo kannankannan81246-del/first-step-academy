@@ -56,6 +56,10 @@ for select to authenticated using (
     and private.staff_can_access_section(r.section_name))
   or exists (select 1 from public.student_roster r where r.student_id=attendance.student_id
     and r.class_name=attendance.class_name and r.active=true
+    and r.class_name in ('Class 9','Class 10') and r.section_name is not null
+    and private.is_assigned_teaching_class(r.board_name,r.class_name,r.section_name,attendance.subject_name,attendance.attendance_date))
+  or exists (select 1 from public.student_roster r where r.student_id=attendance.student_id
+    and r.class_name=attendance.class_name and r.active=true
     and r.class_name in ('Class 11','Class 12') and private.is_assigned_subject(attendance.subject_name))
 );
 
