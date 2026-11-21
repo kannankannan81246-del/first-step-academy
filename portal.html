@@ -515,7 +515,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         <!-- CLASS ASSIGNMENT -->
         <div class="panel hidden" id="assignments">
           <h3>Assign Sections to Staff</h3>
-          <p class="muted">Each staff member can handle one section only. Sections C (State Board) and D (CBSE) must have different staff members.</p>
+          <p class="muted">Each staff member can be assigned up to two sections. A section can be assigned to only one staff member.</p>
 
           <div class="fields">
             <div class="field">
@@ -527,15 +527,15 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
               <label>Select Section</label>
               <select id="assignSection">
                 <option value="A">Section A · Classes 1–5</option>
-                <option value="B">Section B · Classes 6–7</option>
-                <option value="C">Section C · State Board 8–10</option>
+                <option value="B">Section B · CBSE Classes 6–8</option>
+                <option value="C">Section C · State Board Classes 6–10</option>
                 <option value="D">Section D · CBSE 9–10</option>
               </select>
             </div>
           </div>
 
           <button class="btn" id="assignSave">Assign Section</button>
-          <p class="muted">To change a staff member's section, select the same staff member above and choose the new section. To remove an assignment, use Remove below.</p>
+          <p class="muted">Choose a staff member and a section, then click Assign Section again to add the second section. Remove an old assignment before replacing it.</p>
           <div id="assignRecords"></div>
           <div class="panel" style="margin-top:18px">
             <h3>Assign Subjects to Staff (Classes 11–12)</h3>
@@ -748,12 +748,11 @@ function localDate() {
 const today = localDate();
 function sectionFor(className, board) {
   const n = Number(String(className || '').replace(/\D/g, ''));
-  if (!n) return '';
-  if (n >= 1 && n <= 5) return 'A';
-  if (n >= 6 && n <= 7) return 'B';
-  if (!board) return '';
-  if (n >= 8 && n <= 10 && board === 'State Board') return 'C';
-  if (n >= 9 && n <= 10 && board === 'CBSE') return 'D';
+  if (!n || !board) return '';
+  if (board === 'CBSE' && n >= 1 && n <= 5) return 'A';
+  if (board === 'CBSE' && n >= 6 && n <= 8) return 'B';
+  if (board === 'State Board' && n >= 6 && n <= 10) return 'C';
+  if (board === 'CBSE' && n >= 9 && n <= 10) return 'D';
   return '';
 }
 
@@ -809,30 +808,21 @@ function showTable(target, headers, rows) {
 }
 
 /* LOGIN */
-$('loginBtn').onclick = async () => {
+async function submitLogin() {
   const email = $('email').value.trim();
   const password = $('password').value;
-
-  if (!email || !password) {
-    return msg('loginMsg', 'Enter your email and password.', true);
-  }
-
+  if (!email || !password) return msg('loginMsg', 'Enter your email and password.', true);
   $('loginBtn').disabled = true;
-
-  const { data, error } = await db.auth.signInWithPassword({
-    email,
-    password
-  });
-
+  const { data, error } = await db.auth.signInWithPassword({email,password});
   $('loginBtn').disabled = false;
-
-  if (error) {
-    return msg('loginMsg', error.message, true);
-  }
-
+  if (error) return msg('loginMsg', error.message, true);
   user = data.user;
   await loadDashboard();
-};
+}
+$('loginBtn').addEventListener('click', submitLogin);
+['email','password'].forEach(id => $(id).addEventListener('keydown', event => {
+  if (event.key === 'Enter') { event.preventDefault(); submitLogin(); }
+}));
 
 /* LOGOUT */
 $('logoutBtn').onclick = async () => {
@@ -1192,11 +1182,11 @@ $('studentSectionSave').onclick = async () => {
   const option = $('studentSectionStudent').selectedOptions[0];
   const className = option ? option.dataset.class : '';
   const section = sectionFor(className, board);
-  const needsBoard = Number(String(className).replace(/\D/g,'')) >= 8;
+  const needsBoard = Number(String(className).replace(/\D/g,'')) >= 6;
   const grade = Number(String(className).replace(/\D/g,''));
   const seniorClass = grade === 11 || grade === 12;
   if (!studentId || (needsBoard && !board) || (!section && !seniorClass)) {
-    return msg('dashMsg', 'Select a student and choose the correct board for Classes 8–10.', true);
+    return msg('dashMsg', 'Select a student and choose the correct board for Classes 6–10.', true);
   }
   const { error } = await db.from('students').update({board_name:board || null,section_name:section || null}).eq('id',studentId);
   if (error) return msg('dashMsg', error.message, true);
@@ -1231,59 +1221,31 @@ $('staffSave').onclick = async () => {
   }
 };
 
-/* ASSIGN ONE SECTION TO EACH STAFF MEMBER */
+/* ASSIGN UP TO TWO SECTIONS TO EACH STAFF MEMBER */
 $('assignSave').onclick = async () => {
   const staffId = $('assignStaff').value;
   const section = $('assignSection').value;
   const sectionName = 'Section ' + section;
-
-  if (!staffId || !section) {
-    return msg('dashMsg', 'Select staff and section.', true);
-  }
+  if (!staffId || !section) return msg('dashMsg', 'Select staff and section.', true);
 
   const { data: currentAssignments, error: readError } = await db
-    .from('staff_class_assignments')
-    .select('staff_id,class_name');
+    .from('staff_class_assignments').select('staff_id,class_name');
+  if (readError) return msg('dashMsg', readError.message, true);
 
-  if (readError) {
-    return msg('dashMsg', readError.message, true);
-  }
+  const ownAssignments = (currentAssignments || []).filter(item => item.staff_id === staffId);
+  if (ownAssignments.some(item => item.class_name === sectionName))
+    return msg('dashMsg', 'This section is already assigned to this staff member.', true);
+  if (ownAssignments.length >= 2)
+    return msg('dashMsg', 'A staff member can have a maximum of two sections. Remove one assignment first.', true);
 
-  const occupied = (currentAssignments || []).find(
-    item => item.class_name === sectionName && item.staff_id !== staffId
-  );
+  const occupied = (currentAssignments || []).find(item => item.class_name === sectionName);
+  if (occupied)
+    return msg('dashMsg', sectionName + ' is already assigned to another staff member. Each section can have only one staff member.', true);
 
-  if (occupied) {
-    return msg('dashMsg', sectionName + ' is already assigned to another staff member. Each section must have separate staff.', true);
-  }
-
-  const ownAssignments = (currentAssignments || []).filter(
-    item => item.staff_id === staffId
-  );
-
-  if (ownAssignments.length > 1) {
-    return msg('dashMsg', 'This staff member has multiple old assignments. Please ask the admin to review them before changing.', true);
-  }
-
-  let result;
-  if (ownAssignments.length === 1) {
-    result = await db
-      .from('staff_class_assignments')
-      .update({ class_name: sectionName })
-      .eq('staff_id', staffId)
-      .eq('class_name', ownAssignments[0].class_name);
-  } else {
-    result = await db
-      .from('staff_class_assignments')
-      .insert({ staff_id: staffId, class_name: sectionName });
-  }
-
-  if (result.error) {
-    msg('dashMsg', result.error.message, true);
-  } else {
-    msg('dashMsg', 'Section assigned successfully. This staff member now has only this section.');
-    await loadAdmin();
-  }
+  const { error } = await db.from('staff_class_assignments').insert({staff_id:staffId,class_name:sectionName});
+  if (error) return msg('dashMsg', error.message, true);
+  msg('dashMsg', sectionName + ' assigned successfully. This staff member now has ' + (ownAssignments.length + 1) + ' section(s).');
+  await loadAdmin();
 };
 
 $('subjectAssignSave').onclick = async () => {
