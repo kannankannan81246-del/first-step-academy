@@ -471,20 +471,29 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
                   <label id="adAllSubjectsLabel"><input type="checkbox" id="adSubjectAll"> All Subjects</label>
                   <label><input type="checkbox" value="Spoken English" class="ad-subject-option ad-standalone-option"> Spoken English</label>
                   <label><input type="checkbox" value="Hindi" class="ad-subject-option ad-standalone-option"> Hindi</label>
-                  <label><input type="checkbox" value="Physics" class="ad-subject-option ad-academic-option"> Physics</label>
-                  <label><input type="checkbox" value="Chemistry" class="ad-subject-option ad-academic-option"> Chemistry</label>
-                  <label><input type="checkbox" value="Biology" class="ad-subject-option ad-academic-option"> Biology</label>
-                  <label><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option"> Mathematics</label>
-                  <label><input type="checkbox" value="Computer Science" class="ad-subject-option ad-academic-option"> Computer Science</label>
+                  <label class="ad-core-subject-label"><input type="checkbox" value="Tamil" class="ad-subject-option ad-academic-option ad-core-option"> Tamil</label>
+                  <label class="ad-core-subject-label"><input type="checkbox" value="English" class="ad-subject-option ad-academic-option ad-core-option"> English</label>
+                  <label class="ad-core-subject-label"><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option ad-core-option"> Mathematics</label>
+                  <label class="ad-core-subject-label"><input type="checkbox" value="Science" class="ad-subject-option ad-academic-option ad-core-option"> Science</label>
+                  <label class="ad-core-subject-label"><input type="checkbox" value="Social Science" class="ad-subject-option ad-academic-option ad-core-option"> Social Science</label>
+                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Physics" class="ad-subject-option ad-academic-option ad-advanced-option"> Physics</label>
+                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Chemistry" class="ad-subject-option ad-academic-option ad-advanced-option"> Chemistry</label>
+                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Biology" class="ad-subject-option ad-academic-option ad-advanced-option"> Biology</label>
+                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option ad-advanced-option"> Mathematics</label>
+                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Computer Science" class="ad-subject-option ad-academic-option ad-advanced-option"> Computer Science</label>
                 </div>
               </details>
               <select id="adSubjects" multiple hidden aria-hidden="true" tabindex="-1">
                 <option value="Spoken English">Spoken English</option>
                 <option value="Hindi">Hindi</option>
+                <option value="Tamil">Tamil</option>
+                <option value="English">English</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Science">Science</option>
+                <option value="Social Science">Social Science</option>
                 <option value="Physics">Physics</option>
                 <option value="Chemistry">Chemistry</option>
                 <option value="Biology">Biology</option>
-                <option value="Mathematics">Mathematics</option>
                 <option value="Computer Science">Computer Science</option>
               </select>
               <small class="muted">All Subjects covers academic subjects only. Spoken English and Hindi can be selected separately.</small>
@@ -1201,7 +1210,9 @@ document.querySelectorAll('[data-tab]').forEach(button => {
 
 /* SAVE ADMISSION */
 const subjectBoxes = [...document.querySelectorAll('.ad-subject-option')];
-const academicSubjectBoxes = [...document.querySelectorAll('.ad-academic-option')];
+let academicSubjectBoxes = [...document.querySelectorAll('.ad-academic-option')];
+const coreSubjectBoxes = [...document.querySelectorAll('.ad-core-option')];
+const advancedSubjectBoxes = [...document.querySelectorAll('.ad-advanced-option')];
 const standaloneSubjectBoxes = [...document.querySelectorAll('.ad-standalone-option')];
 const subjectAll = $('adSubjectAll');
 function allSubjectsEligible() {
@@ -1211,9 +1222,15 @@ function allSubjectsEligible() {
          (board === 'State Board' && grade >= 6 && grade <= 10);
 }
 function updateAdmissionSubjectOptions() {
-  const eligible = allSubjectsEligible();
-  $('adAllSubjectsLabel').classList.toggle('hidden', !eligible);
-  if (!eligible) subjectAll.checked = false;
+  const coreGroup = allSubjectsEligible();
+  $('adAllSubjectsLabel').classList.toggle('hidden', !coreGroup);
+  document.querySelectorAll('.ad-core-subject-label').forEach(label => label.classList.toggle('hidden', !coreGroup));
+  document.querySelectorAll('.ad-advanced-subject-label').forEach(label => label.classList.toggle('hidden', coreGroup));
+  academicSubjectBoxes = coreGroup ? coreSubjectBoxes : advancedSubjectBoxes;
+  [...coreSubjectBoxes, ...advancedSubjectBoxes].forEach(box => {
+    if (!academicSubjectBoxes.includes(box)) { box.checked = false; box.disabled = false; }
+  });
+  if (!coreGroup) subjectAll.checked = false;
   syncAdmissionSubjects();
 }
 function syncAdmissionSubjects() {
@@ -1221,12 +1238,12 @@ function syncAdmissionSubjects() {
   academicSubjectBoxes.forEach(box => { box.disabled = all; });
   standaloneSubjectBoxes.forEach(box => { box.disabled = false; });
   const selected = [
-    ...(all ? academicSubjectBoxes.map(box => box.value) : academicSubjectBoxes.filter(box => box.checked).map(box => box.value)),
+    ...(all ? coreSubjectBoxes.map(box => box.value) : academicSubjectBoxes.filter(box => box.checked).map(box => box.value)),
     ...standaloneSubjectBoxes.filter(box => box.checked).map(box => box.value)
   ];
   [...$('adSubjects').options].forEach(option => { option.selected = selected.includes(option.value); });
   const labels = [];
-  if (all) labels.push('All Academic Subjects');
+  if (all) labels.push('All Subjects');
   labels.push(...standaloneSubjectBoxes.filter(box => box.checked).map(box => box.value));
   if (!all) labels.push(...academicSubjectBoxes.filter(box => box.checked).map(box => box.value));
   $('subjectPickerSummary').textContent = labels.length ? labels.join(', ') : 'Choose one or more subjects';
@@ -1239,7 +1256,7 @@ subjectBoxes.forEach(box => box.addEventListener('change', syncAdmissionSubjects
 function resetAdmissionSubjects() {
   subjectAll.checked = false;
   subjectBoxes.forEach(box => { box.checked = false; box.disabled = false; });
-  syncAdmissionSubjects();
+  updateAdmissionSubjectOptions();
 }
 updateAdmissionSubjectOptions();
 
