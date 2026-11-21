@@ -21,8 +21,8 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 - Monthly Excel workbook with separate worksheets for Sections A–E, Spoken English, Hindi and CBSE Classes 11–12
 - Additional cross-section class-and-subject assignments for Classes 9–10 with weekday scheduling (e.g. CBSE Section D Class 9 / Section E Class 10 Social Science)
 - Subject-specific access for Classes 11–12
-- Student and staff dashboards, class attendance, admin-only RFID IN/OUT attendance, notices, achievements and gallery
-- Notices and student achievements
+- Student and staff dashboards, class attendance, admin-only RFID IN/OUT attendance, achievements and gallery
+- Student achievements
 - Staff gallery submissions with admin approval
 - Admin gallery publishing and website content editor
 - Admin-only fee management: class-wise fee rates, student fee accounts, discounts, due dates, payment receipts and payment history
