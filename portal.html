@@ -1355,7 +1355,7 @@ async function loadStaff() {
     visibleSections.map(x=>'<option value="'+esc(x)+'">Section '+esc(x)+'</option>').join('') +
     '<option value="SPOKEN">Spoken English</option><option value="HINDI">Hindi</option>' +
     staffTeachingAssignments.map(a=>'<option value="TEACH:'+esc(a.id)+'">'+esc(a.board_name)+' · Section '+esc(a.section_name)+' · '+esc(a.class_name)+' · '+esc(a.subject_name)+' · '+esc(a.day_of_week?dayNames[a.day_of_week]:'Any day')+'</option>').join('')+
-    (assignedSubjects.length ? '<option value="SENIOR">My Subject Students (Classes 11–12)</option>' : '');
+    (assignedSubjects.length ? '<option value="SENIOR11">CBSE Class 11 · Subject</option><option value="SENIOR12">CBSE Class 12 · Subject</option>' : '');
 
   const sectionSubjects = new Set();
   if(visibleSections.length) {
@@ -1376,9 +1376,9 @@ async function loadStaff() {
       subjectLabel.textContent='Assigned subject';
       subjectSelect.disabled=true;
       subjectSelect.required=true;
-    } else if(group==='SENIOR') {
+    } else if(group==='SENIOR11'||group==='SENIOR12') {
       choices = assignedSubjects;
-      subjectLabel.textContent = 'Subject (Assigned Classes 11–12)';
+      subjectLabel.textContent = 'Subject (Assigned Class '+(group==='SENIOR11'?'11':'12')+')';
       subjectSelect.disabled = false;
       subjectSelect.required = true;
     } else if(group==='D' || group==='E') {
@@ -1413,7 +1413,7 @@ $('loadRoster').onclick = async () => {
   const group = $('classSelect').value;
   const subject = $('attendanceSubject').value;
   if(!group) return msg('dashMsg','No assigned section or class-subject access available.',true);
-  if((group==='SENIOR'||group==='D'||group==='E')&&!subject)return msg('dashMsg','Select a subject before loading this class.',true);
+  if((group==='SENIOR11'||group==='SENIOR12'||group==='D'||group==='E')&&!subject)return msg('dashMsg','Select a subject before loading this class.',true);
 
   const isTeaching=group.startsWith('TEACH:');
   const teachingAssignment=isTeaching?staffTeachingAssignments.find(a=>'TEACH:'+a.id===group):null;
@@ -1431,7 +1431,7 @@ $('loadRoster').onclick = async () => {
     .eq('active',true).order('full_name');
   if(isTeaching){
     query=query.eq('board_name',teachingAssignment.board_name).eq('section_name',teachingAssignment.section_name).eq('class_name',teachingAssignment.class_name);
-  } else if(group==='SENIOR') query=query.eq('board_name','CBSE').in('class_name',['Class 11','Class 12']);
+  } else if(group==='SENIOR11'||group==='SENIOR12') query=query.eq('board_name','CBSE').eq('class_name',group==='SENIOR11'?'Class 11':'Class 12');
   else if(group==='SPOKEN'||group==='HINDI') query=query.contains('subjects',[subject]);
   else query=query.eq('section_name',group);
 
@@ -1445,12 +1445,12 @@ $('loadRoster').onclick = async () => {
     if(group==='SPOKEN'||group==='HINDI')return hasSubject;
     if(group==='D')return student.board_name==='CBSE'&&grade===9&&!!subject&&hasSubject;
     if(group==='E')return student.board_name==='CBSE'&&grade===10&&!!subject&&hasSubject;
-    if(group==='SENIOR')return student.board_name==='CBSE'&&(grade===11||grade===12)&&!!subject&&hasSubject;
+    if(group==='SENIOR11'||group==='SENIOR12')return student.board_name==='CBSE'&&student.class_name===(group==='SENIOR11'?'Class 11':'Class 12')&&!!subject&&hasSubject;
     if(grade>=1&&grade<=8)return !subject;
     if(grade>=9&&grade<=10)return student.board_name==='State Board'&&!subject;
     return false;
   });
-  rosterRows=matches.map(student=>({...student,attendance_subject:(group==='SPOKEN'||group==='HINDI'||group==='D'||group==='E'||group==='SENIOR'||isTeaching)?subject:''}));
+  rosterRows=matches.map(student=>({...student,attendance_subject:(group==='SPOKEN'||group==='HINDI'||group==='D'||group==='E'||group==='SENIOR11'||group==='SENIOR12'||isTeaching)?subject:''}));
 
   $('roster').innerHTML = rosterRows.length
     ? rosterRows.map(s =>
