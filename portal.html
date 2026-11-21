@@ -1152,7 +1152,7 @@ document.querySelectorAll('[data-tab]').forEach(button => {
       b.classList.toggle('active', b === button);
     });
 
-    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent', 'rfidAttendance', 'feeManagement']
+    ['admissions', 'staffAttendance', 'studentsList', 'assignments', 'adminNotices', 'adminAchievements', 'adminGallery', 'websiteContent', 'rfidAttendance', 'feeManagement', 'attendanceReports']
       .forEach(id => {
         $(id).classList.toggle('hidden', id !== button.dataset.tab);
       });
