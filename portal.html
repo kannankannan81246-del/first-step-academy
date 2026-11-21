@@ -270,6 +270,16 @@ tbody tr:hover{background:#f8fbfc}
 #feeManagement table{min-width:680px}
 @media(max-width:800px){.fee-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:430px){.fee-overview{gap:8px}.fee-stat{padding:13px}.fee-stat strong{font-size:1.35rem}}
+.subject-picker{position:relative;width:100%}
+.subject-picker summary{list-style:none;cursor:pointer;background:#fff;border:1px solid #cbd5e1;border-radius:10px;padding:12px 42px 12px 14px;color:#142944;min-height:44px;position:relative}
+.subject-picker summary::-webkit-details-marker{display:none}
+.subject-picker summary:after{content:"▾";position:absolute;right:15px;top:10px;color:#64748b;font-size:18px}
+.subject-picker[open] summary:after{content:"▴"}
+.subject-options{margin-top:7px;padding:9px;background:#fff;border:1px solid #dbe3ec;border-radius:12px;box-shadow:0 12px 28px rgba(15,35,60,.12);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;max-height:240px;overflow:auto}
+.subject-options label{display:flex;align-items:center;gap:9px;padding:10px;border-radius:8px;cursor:pointer;font-size:.92rem}
+.subject-options label:hover{background:#f1f6fb}
+.subject-options input{width:17px;height:17px;accent-color:#087f73;flex:none}
+@media(max-width:560px){.subject-options{grid-template-columns:1fr}}
 footer{background:#102541;margin-top:20px;padding:27px 0}
 #dashboard>.panel:first-child{background:linear-gradient(120deg,#102541,#1a4562);color:white;border:0}
 #dashboard>.panel:first-child h3{color:white;font-size:1.45rem;margin:0}
@@ -455,8 +465,20 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
 
             <div class="field full">
               <label>Subjects</label>
-              <select id="adSubjects" multiple size="7" aria-label="Select student subjects">
-                <option value="__ALL__">All Subjects</option>
+              <details class="subject-picker" id="subjectPicker">
+                <summary id="subjectPickerSummary">Choose one or more subjects</summary>
+                <div class="subject-options">
+                  <label><input type="checkbox" value="__ALL__" id="adSubjectAll"> All Subjects</label>
+                  <label><input type="checkbox" value="Spoken English" class="ad-subject-option"> Spoken English</label>
+                  <label><input type="checkbox" value="Hindi" class="ad-subject-option"> Hindi</label>
+                  <label><input type="checkbox" value="Physics" class="ad-subject-option"> Physics</label>
+                  <label><input type="checkbox" value="Chemistry" class="ad-subject-option"> Chemistry</label>
+                  <label><input type="checkbox" value="Biology" class="ad-subject-option"> Biology</label>
+                  <label><input type="checkbox" value="Mathematics" class="ad-subject-option"> Mathematics</label>
+                  <label><input type="checkbox" value="Computer Science" class="ad-subject-option"> Computer Science</label>
+                </div>
+              </details>
+              <select id="adSubjects" multiple hidden aria-hidden="true" tabindex="-1">
                 <option value="Spoken English">Spoken English</option>
                 <option value="Hindi">Hindi</option>
                 <option value="Physics">Physics</option>
@@ -465,7 +487,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
                 <option value="Mathematics">Mathematics</option>
                 <option value="Computer Science">Computer Science</option>
               </select>
-              <small class="muted">Choose one or more subjects. Select “All Subjects” to include every subject in this list.</small>
+              <small class="muted">Tick one or more subjects. You can select multiple options.</small>
             </div>
 
             <div class="field">
@@ -1177,6 +1199,30 @@ document.querySelectorAll('[data-tab]').forEach(button => {
 });
 
 /* SAVE ADMISSION */
+const subjectBoxes = [...document.querySelectorAll('.ad-subject-option')];
+const subjectAll = $('adSubjectAll');
+function syncAdmissionSubjects() {
+  const all = subjectAll.checked;
+  subjectBoxes.forEach(box => { box.disabled = all; });
+  const selected = all ? subjectBoxes.map(box => box.value) : subjectBoxes.filter(box => box.checked).map(box => box.value);
+  [...$('adSubjects').options].forEach(option => { option.selected = selected.includes(option.value); });
+  $('subjectPickerSummary').textContent = all ? 'All Subjects selected' : selected.length ? selected.join(', ') : 'Choose one or more subjects';
+}
+subjectAll.addEventListener('change', () => {
+  if (subjectAll.checked) subjectBoxes.forEach(box => { box.checked = false; });
+  syncAdmissionSubjects();
+});
+subjectBoxes.forEach(box => box.addEventListener('change', () => {
+  subjectAll.checked = false;
+  syncAdmissionSubjects();
+}));
+function resetAdmissionSubjects() {
+  subjectAll.checked = false;
+  subjectBoxes.forEach(box => { box.checked = false; box.disabled = false; });
+  syncAdmissionSubjects();
+}
+syncAdmissionSubjects();
+
 $('adSave').onclick = async () => {
   const name = $('adName').value.trim();
   const cls = $('adClass').value;
@@ -1225,7 +1271,7 @@ $('adSave').onclick = async () => {
       'adName',
       'adPhone', 'adAddress', 'adPrevious'
     ].forEach(id => $(id).value = '');
-    [...$('adSubjects').options].forEach(option => option.selected = false);
+    resetAdmissionSubjects();
     $('adCode').value = 'FSA — Generated automatically';
 
     $('adBoard').value = '';
