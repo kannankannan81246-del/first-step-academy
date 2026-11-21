@@ -416,16 +416,6 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             </div>
 
             <div class="field">
-              <label>Date of Birth</label>
-              <input id="adDob" type="date">
-            </div>
-
-            <div class="field">
-              <label>Parent / Guardian Name</label>
-              <input id="adGuardian">
-            </div>
-
-            <div class="field">
               <label>Parent Contact Number</label>
               <input id="adPhone" type="tel">
             </div>
@@ -1217,8 +1207,6 @@ $('adSave').onclick = async () => {
     class_name: cls,
     board_name: board,
     section_name: section || null,
-    date_of_birth: $('adDob').value || null,
-    guardian_name: $('adGuardian').value.trim() || null,
     guardian_phone: $('adPhone').value.trim() || null,
     address: $('adAddress').value.trim() || null,
     subjects,
@@ -1234,7 +1222,7 @@ $('adSave').onclick = async () => {
     msg('dashMsg', 'Admission saved successfully.');
 
     [
-      'adName', 'adDob', 'adGuardian',
+      'adName',
       'adPhone', 'adAddress', 'adPrevious'
     ].forEach(id => $(id).value = '');
     [...$('adSubjects').options].forEach(option => option.selected = false);
