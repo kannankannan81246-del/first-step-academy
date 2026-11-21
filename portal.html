@@ -476,11 +476,19 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
                   <label class="ad-core-subject-label"><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option ad-core-option"> Mathematics</label>
                   <label class="ad-core-subject-label"><input type="checkbox" value="Science" class="ad-subject-option ad-academic-option ad-core-option"> Science</label>
                   <label class="ad-core-subject-label"><input type="checkbox" value="Social Science" class="ad-subject-option ad-academic-option ad-core-option"> Social Science</label>
-                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Physics" class="ad-subject-option ad-academic-option ad-advanced-option"> Physics</label>
-                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Chemistry" class="ad-subject-option ad-academic-option ad-advanced-option"> Chemistry</label>
-                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Biology" class="ad-subject-option ad-academic-option ad-advanced-option"> Biology</label>
-                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option ad-advanced-option"> Mathematics</label>
-                  <label class="ad-advanced-subject-label"><input type="checkbox" value="Computer Science" class="ad-subject-option ad-academic-option ad-advanced-option"> Computer Science</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Physics" class="ad-subject-option ad-academic-option ad-grade9-option"> Physics</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Chemistry" class="ad-subject-option ad-academic-option ad-grade9-option"> Chemistry</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Biology" class="ad-subject-option ad-academic-option ad-grade9-option"> Biology</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option ad-grade9-option"> Mathematics</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="English" class="ad-subject-option ad-academic-option ad-grade9-option"> English</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Tamil" class="ad-subject-option ad-academic-option ad-grade9-option"> Tamil</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Computer Science" class="ad-subject-option ad-academic-option ad-grade9-option"> Computer Science</label>
+                  <label class="ad-grade9-subject-label"><input type="checkbox" value="Social Science" class="ad-subject-option ad-academic-option ad-grade9-option"> Social Science</label>
+                  <label class="ad-senior-subject-label"><input type="checkbox" value="Physics" class="ad-subject-option ad-academic-option ad-senior-option"> Physics</label>
+                  <label class="ad-senior-subject-label"><input type="checkbox" value="Chemistry" class="ad-subject-option ad-academic-option ad-senior-option"> Chemistry</label>
+                  <label class="ad-senior-subject-label"><input type="checkbox" value="Biology" class="ad-subject-option ad-academic-option ad-senior-option"> Biology</label>
+                  <label class="ad-senior-subject-label"><input type="checkbox" value="Mathematics" class="ad-subject-option ad-academic-option ad-senior-option"> Mathematics</label>
+                  <label class="ad-senior-subject-label"><input type="checkbox" value="Computer Science" class="ad-subject-option ad-academic-option ad-senior-option"> Computer Science</label>
                 </div>
               </details>
               <select id="adSubjects" multiple hidden aria-hidden="true" tabindex="-1">
@@ -590,7 +598,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
               <div class="field"><label>Select Staff</label><select id="teachingAssignStaff"></select></div>
               <div class="field"><label>Board</label><select id="teachingAssignBoard"><option>CBSE</option><option>State Board</option></select></div>
               <div class="field"><label>Class</label><select id="teachingAssignClass"><option>Class 9</option><option>Class 10</option></select></div>
-              <div class="field"><label>Subject</label><input id="teachingAssignSubject" placeholder="e.g. Social Science"></div>
+              <div class="field"><label>Subject</label><select id="teachingAssignSubject"><option value="">Select subject</option><option>Physics</option><option>Chemistry</option><option>Biology</option><option>Mathematics</option><option>English</option><option>Tamil</option><option>Computer Science</option><option>Social Science</option></select></div>
               <div class="field"><label>Day</label><select id="teachingAssignDay"><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option><option value="">Any day / not specified</option></select></div>
             </div>
             <button class="btn" id="teachingAssignSave">Add Class &amp; Subject</button>
@@ -1206,10 +1214,11 @@ document.querySelectorAll('[data-tab]').forEach(button => {
 
 /* SAVE ADMISSION */
 const subjectBoxes = [...document.querySelectorAll('.ad-subject-option')];
-let academicSubjectBoxes = [...document.querySelectorAll('.ad-academic-option')];
 const coreSubjectBoxes = [...document.querySelectorAll('.ad-core-option')];
-const advancedSubjectBoxes = [...document.querySelectorAll('.ad-advanced-option')];
+const grade9SubjectBoxes = [...document.querySelectorAll('.ad-grade9-option')];
+const seniorSubjectBoxes = [...document.querySelectorAll('.ad-senior-option')];
 const standaloneSubjectBoxes = [...document.querySelectorAll('.ad-standalone-option')];
+let academicSubjectBoxes = [];
 const subjectAll = $('adSubjectAll');
 function allSubjectsEligible() {
   const grade = Number(String($('adClass').value || '').replace(/\D/g, ''));
@@ -1218,12 +1227,17 @@ function allSubjectsEligible() {
          (board === 'State Board' && grade >= 6 && grade <= 10);
 }
 function updateAdmissionSubjectOptions() {
+  const grade = Number(String($('adClass').value || '').replace(/\D/g, ''));
+  const board = $('adBoard').value;
   const coreGroup = allSubjectsEligible();
+  const grade9Group = board === 'CBSE' && (grade === 9 || grade === 10);
+  const seniorGroup = board === 'CBSE' && (grade === 11 || grade === 12);
   $('adAllSubjectsLabel').classList.toggle('hidden', !coreGroup);
   document.querySelectorAll('.ad-core-subject-label').forEach(label => label.classList.toggle('hidden', !coreGroup));
-  document.querySelectorAll('.ad-advanced-subject-label').forEach(label => label.classList.toggle('hidden', coreGroup));
-  academicSubjectBoxes = coreGroup ? coreSubjectBoxes : advancedSubjectBoxes;
-  [...coreSubjectBoxes, ...advancedSubjectBoxes].forEach(box => {
+  document.querySelectorAll('.ad-grade9-subject-label').forEach(label => label.classList.toggle('hidden', !grade9Group));
+  document.querySelectorAll('.ad-senior-subject-label').forEach(label => label.classList.toggle('hidden', !seniorGroup));
+  academicSubjectBoxes = coreGroup ? coreSubjectBoxes : grade9Group ? grade9SubjectBoxes : seniorGroup ? seniorSubjectBoxes : [];
+  [...coreSubjectBoxes, ...grade9SubjectBoxes, ...seniorSubjectBoxes].forEach(box => {
     if (!academicSubjectBoxes.includes(box)) { box.checked = false; box.disabled = false; }
   });
   if (!coreGroup) subjectAll.checked = false;
@@ -1406,7 +1420,10 @@ $('teachingAssignSave').onclick = async () => {
 $('subjectAssignSave').onclick = async () => {
   const staffId = $('subjectAssignStaff').value;
   const subject = $('subjectAssignName').value.trim().replace(/\s+/g, ' ');
+  const allowedSeniorSubjects=['Physics','Chemistry','Biology','Mathematics','Computer Science'];
   if(!staffId || !subject) return msg('dashMsg', 'Select a staff member and enter a subject.', true);
+  if(!allowedSeniorSubjects.some(item=>item.toLowerCase()===subject.toLowerCase()))
+    return msg('dashMsg','For CBSE Classes 11–12, choose Physics, Chemistry, Biology, Mathematics or Computer Science.',true);
   const {error} = await db.from('staff_subject_assignments').upsert(
     {staff_id:staffId,subject_name:subject},{onConflict:'staff_id,subject_name',ignoreDuplicates:true}
   );
@@ -1469,12 +1486,16 @@ async function loadStaff() {
       subjectSelect.disabled=true;
       subjectSelect.required=true;
     } else if(group==='SENIOR11'||group==='SENIOR12') {
-      choices = assignedSubjects;
-      subjectLabel.textContent = 'Subject (Assigned Class '+(group==='SENIOR11'?'11':'12')+')';
+      const seniorSubjectList=['Physics','Chemistry','Biology','Mathematics','Computer Science'];
+      choices = seniorSubjectList.filter(subject=>assignedSubjects.some(assigned=>assigned.toLowerCase()===subject.toLowerCase()));
+      subjectLabel.textContent = 'Subject (CBSE Class '+(group==='SENIOR11'?'11':'12')+' · Assigned subjects)';
       subjectSelect.disabled = false;
       subjectSelect.required = true;
     } else if(group==='D' || group==='E') {
-      choices=[...sectionSubjects];subjectLabel.textContent='Subject (CBSE Classes 9–10)';subjectSelect.disabled=false;subjectSelect.required=true;
+      choices=['Physics','Chemistry','Biology','Mathematics','English','Tamil','Computer Science','Social Science'];
+      subjectLabel.textContent='Subject (CBSE Classes 9–10)';
+      subjectSelect.disabled=false;
+      subjectSelect.required=true;
     } else {
       subjectLabel.textContent = 'Subject (Not required for Classes 1–8)';
       subjectSelect.disabled = true;
@@ -1560,20 +1581,42 @@ $('saveRoster').onclick = async () => {
   if(!rosterRows.length) return msg('dashMsg','Load the student list first.',true);
   const date=$('classDate').value;
   if(!date) return msg('dashMsg','Select an attendance date.',true);
+  const subject=$('attendanceSubject').value;
+  const group=$('classSelect').value;
+  if((group==='D'||group==='E'||group==='SENIOR11'||group==='SENIOR12'||group.startsWith('TEACH:'))&&!subject)
+    return msg('dashMsg','Select the subject before saving attendance.',true);
 
-  const rows=rosterRows.map(student=>({
-    student_id:student.student_id,
-    class_name:student.class_name,
-    attendance_date:date,
-    subject_name:student.attendance_subject || '',
-    status:$('roster').querySelector('[data-student="'+student.student_id+'"]').value,
-    marked_by:user.id
-  }));
-  const {error}=await db.from('attendance').upsert(rows,{
-    onConflict:'student_id,attendance_date,subject_name'
+  const rows=rosterRows.map(student=>{
+    const control=$('roster').querySelector('[data-student="'+student.student_id+'"]');
+    if(!control) throw new Error('Attendance status is missing for '+student.full_name+'. Reload the roster and try again.');
+    return {
+      student_id:student.student_id,
+      class_name:student.class_name,
+      attendance_date:date,
+      subject_name:student.attendance_subject || '',
+      status:control.value,
+      marked_by:user.id
+    };
   });
-  if(error) return msg('dashMsg',error.message,true);
-  msg('dashMsg','Student attendance saved successfully.');
+  const button=$('saveRoster');
+  button.disabled=true;
+  const originalText=button.textContent;
+  button.textContent='Saving attendance…';
+  try {
+    const {data,error}=await db.from('attendance').upsert(rows,{
+      onConflict:'student_id,attendance_date,subject_name'
+    }).select('student_id');
+    if(error) throw error;
+    if(!data||data.length!==rows.length)
+      throw new Error('The database did not confirm every attendance row. Please refresh and check before saving again.');
+    msg('dashMsg','Attendance saved successfully for '+data.length+' student(s) · '+subject+' · '+date+'.');
+  } catch(error) {
+    const detail=[error.message,error.code?'Code: '+error.code:'',error.details,error.hint].filter(Boolean).join(' | ');
+    msg('dashMsg','Attendance was not saved: '+detail,true);
+  } finally {
+    button.disabled=false;
+    button.textContent=originalText;
+  }
 };
 
 /* MONTHLY ATTENDANCE EXCEL EXPORT — ADMIN OVERALL / STAFF ASSIGNED CLASSES */
