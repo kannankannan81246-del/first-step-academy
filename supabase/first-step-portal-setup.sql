@@ -62,10 +62,9 @@ where class_name in ('Class 1','Class 3')
 on conflict (staff_id,class_name) do nothing;
 delete from public.staff_class_assignments where class_name in ('Class 1','Class 3');
 
--- Enforce one section per staff member and one staff member per section.
--- Existing assignments are preserved; legacy class labels must be mapped by an admin.
-create unique index if not exists staff_class_assignments_one_section_per_staff_uidx
-  on public.staff_class_assignments(staff_id);
+-- Each staff member may have up to two sections; each section belongs to one staff member.
+-- The portal enforces the two-section limit when an admin assigns sections.
+drop index if exists public.staff_class_assignments_one_section_per_staff_uidx;
 create unique index if not exists staff_class_assignments_one_staff_per_section_uidx
   on public.staff_class_assignments(class_name);
 
