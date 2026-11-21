@@ -526,7 +526,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             </div>
 
             <div class="field">
-              <label>Select Section</label>
+              <label>Select Attendance Group</label>
               <select id="assignSection">
                 <option value="A">Section A · Classes 1–5</option>
                 <option value="B">Section B · CBSE Classes 6–8</option>
@@ -541,7 +541,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
           <p class="muted">Choose a staff member and a section, then click Assign Section again to add another section.</p><div id="assignRecords"></div><div class="panel" style="margin-top:18px"><h3>Staff Attendance Access</h3><p class="muted">Choose assigned sections only or all sections A–E.</p><div class="fields"><div class="field"><label>Staff</label><select id="attendanceAccessStaff"></select></div><div class="field"><label>Permission</label><select id="attendanceAccessMode"><option value="assigned">Assigned Sections Only</option><option value="all">All Sections (A–E)</option></select></div></div><button class="btn" id="attendanceAccessSave">Save Attendance Permission</button><div id="attendanceAccessList"></div></div>
           <div class="panel" style="margin-top:18px">
             <h3>Additional Class &amp; Subject Timetable (Classes 9–10)</h3>
-            <p class="muted">Example: a Section C staff member can take CBSE Section D Class 9 Social Science on Monday and Class 10 Social Science on Tuesday.</p>
+            <p class="muted">Example: a Section C staff member can take CBSE Section D Class 9 Social Science on Monday and Section E Class 10 Social Science on Tuesday.</p>
             <div class="fields">
               <div class="field"><label>Select Staff</label><select id="teachingAssignStaff"></select></div>
               <div class="field"><label>Board</label><select id="teachingAssignBoard"><option>CBSE</option><option>State Board</option></select></div>
@@ -678,7 +678,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
       <!-- STAFF DASHBOARD -->
       <div id="staffDash" class="hidden">
         <div class="panel">
-          <h3>My Assigned Sections</h3>
+          <h3>Student Attendance</h3>
           <p id="myClasses"></p>
 
           <div class="fields">
@@ -692,7 +692,7 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
               <input id="classDate" type="date">
             </div>
             <div class="field">
-              <label>Subject (Required for Classes 9–12)</label>
+              <label>Subject / Attendance Category</label>
               <select id="attendanceSubject"><option value="">No Subject (Classes 1–8)</option></select>
             </div>
           </div>
