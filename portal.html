@@ -253,6 +253,23 @@ tbody tr:last-child td{border-bottom:0}
 tbody tr:hover{background:#f8fbfc}
 .notice{border:1px solid #d6eee8}
 .error{border-color:#f4d6d2}
+.auto-tag{display:inline-block;margin-left:6px;padding:3px 7px;border-radius:20px;background:#e7f6f2;color:#087d72;font-size:.65rem;font-weight:800;letter-spacing:.5px;vertical-align:middle}
+#adSubjects{min-height:156px;background:#fbfdff}
+#adSubjects option{padding:7px 9px}
+.fee-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:18px 0}
+.fee-stat{padding:18px;border-radius:17px;background:linear-gradient(145deg,#102541,#1c4264);color:#fff;box-shadow:0 10px 24px rgba(16,37,65,.12);display:flex;flex-direction:column;gap:7px}
+.fee-stat:nth-child(2){background:linear-gradient(145deg,#087f73,#16a394)}
+.fee-stat:nth-child(3){background:linear-gradient(145deg,#745b2b,#b58a43)}
+.fee-stat:nth-child(4){background:linear-gradient(145deg,#394b68,#657c9b)}
+.fee-stat span{font-size:.78rem;opacity:.88;font-weight:600}
+.fee-stat strong{font-size:1.65rem;letter-spacing:-.5px}
+.fee-stat small{font-size:.72rem;opacity:.78}
+#feeManagement>.panel{margin:16px 0;background:#fff;border:1px solid #e3eaf1;border-radius:18px}
+#feeManagement>.panel h4{color:#102541;margin:0 0 17px;font-size:1.05rem}
+#feeManagement .tableWrap{box-shadow:0 5px 18px rgba(16,37,65,.04);overflow-x:auto}
+#feeManagement table{min-width:680px}
+@media(max-width:800px){.fee-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:430px){.fee-overview{gap:8px}.fee-stat{padding:13px}.fee-stat strong{font-size:1.35rem}}
 footer{background:#102541;margin-top:20px;padding:27px 0}
 #dashboard>.panel:first-child{background:linear-gradient(120deg,#102541,#1a4562);color:white;border:0}
 #dashboard>.panel:first-child h3{color:white;font-size:1.45rem;margin:0}
@@ -393,8 +410,9 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             </div>
 
             <div class="field">
-              <label>Student Code</label>
-              <input id="adCode">
+              <label>Student Code <span class="auto-tag">AUTO</span></label>
+              <input id="adCode" value="FSA — Generated automatically" readonly aria-readonly="true">
+              <small class="muted">A unique FSA code is assigned when the admission is saved.</small>
             </div>
 
             <div class="field">
@@ -446,8 +464,18 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
             </div>
 
             <div class="field full">
-              <label>Subjects (separate with commas)</label>
-              <input id="adSubjects">
+              <label>Subjects</label>
+              <select id="adSubjects" multiple size="7" aria-label="Select student subjects">
+                <option value="__ALL__">All Subjects</option>
+                <option value="Spoken English">Spoken English</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Physics">Physics</option>
+                <option value="Chemistry">Chemistry</option>
+                <option value="Biology">Biology</option>
+                <option value="Mathematics">Mathematics</option>
+                <option value="Computer Science">Computer Science</option>
+              </select>
+              <small class="muted">Choose one or more subjects. Select “All Subjects” to include every subject in this list.</small>
             </div>
 
             <div class="field">
@@ -622,7 +650,13 @@ header{background:rgba(255,255,255,.96);box-shadow:0 5px 24px rgba(16,37,65,.06)
         <div class="panel hidden" id="feeManagement">
           <h3>Fee Management</h3>
           <p class="muted">Admin-only fee structure, student fee accounts, payment entries and payment history.</p>
-          <div class="panel">
+          <div class="fee-overview" id="feeOverview">
+            <div class="fee-stat"><span>Active Fee Accounts</span><strong id="feeStatAccounts">—</strong><small>Students with assigned fees</small></div>
+            <div class="fee-stat"><span>Total Collected</span><strong id="feeStatCollected">—</strong><small>Recorded payments</small></div>
+            <div class="fee-stat"><span>Total Assigned</span><strong id="feeStatAssigned">—</strong><small>After discounts</small></div>
+            <div class="fee-stat"><span>Balance Pending</span><strong id="feeStatPending">—</strong><small>Estimated outstanding</small></div>
+          </div>
+          <div class="panel fee-workspace">
             <h4>Assign Fee to Student</h4>
             <div class="fields">
               <div class="field"><label>Student</label><select id="feeStudentSelect"><option value="">Select student</option></select></div>
@@ -1092,6 +1126,14 @@ async function loadFeeManagement() {
   $('feeStudentSelect').innerHTML='<option value="">Select student</option>'+feeStudents.filter(s=>s.active).map(s=>'<option value="'+esc(s.id)+'">'+esc(s.full_name)+' · '+esc(s.student_code)+' · '+esc(s.class_name)+'</option>').join('');
   $('feeClassSelect').innerHTML='<option value="">Select fee class</option>'+feeClasses.map(c=>'<option value="'+esc(c.id)+'">'+esc(c.class_name)+' · Tuition ₹'+Number(c.tuition_fee).toLocaleString('en-IN')+' + Other ₹'+Number(c.other_fee).toLocaleString('en-IN')+'</option>').join('');
   $('feePaymentAccount').innerHTML='<option value="">Select account</option>'+feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{};return '<option value="'+esc(a.id)+'">'+esc(st.full_name||'Student')+' · '+esc(st.student_code||'')+'</option>';}).join('');
+  const totalCollected=feePayments.reduce((sum,p)=>sum+Number(p.amount||0),0);
+  const totalAssigned=feeAccounts.reduce((sum,a)=>{const cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return sum+Math.max(0,Number(cl.tuition_fee||0)+Number(cl.other_fee||0)-Number(a.discount||0));},0);
+  const balancePending=Math.max(0,totalAssigned-totalCollected);
+  const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0});
+  $('feeStatAccounts').textContent=String(feeAccounts.length);
+  $('feeStatCollected').textContent=money(totalCollected);
+  $('feeStatAssigned').textContent=money(totalAssigned);
+  $('feeStatPending').textContent=money(balancePending);
   const accountRows=feeAccounts.map(a=>{const st=feeStudents.find(s=>s.id===a.student_id)||{},cl=feeClasses.find(c=>c.id===a.fee_class_id)||{};return [st.student_code||'—',st.full_name||'Student',cl.class_name||'—',a.pay_mode,'₹'+Number(a.discount||0).toLocaleString('en-IN'),a.due_date||'—'];});
   showTable('feeAccountList',['Code','Student','Fee Class','Plan','Discount','Due Date'],accountRows);
   $('feePaymentList').innerHTML='<div class="tableWrap"><table><thead><tr><th>Receipt</th><th>Date</th><th>Student</th><th>Amount</th><th>Mode</th><th>Reference</th><th>Status</th><th>Action</th></tr></thead><tbody>'+feePayments.map(p=>{const a=feeAccounts.find(x=>x.id===p.account_id)||{},st=feeStudents.find(x=>x.id===a.student_id)||{};return '<tr><td>'+esc(p.receipt_no)+'</td><td>'+esc(p.payment_date)+'</td><td>'+esc(st.full_name||'Student')+'</td><td>₹'+Number(p.amount).toLocaleString('en-IN')+'</td><td>'+esc(p.payment_mode)+'</td><td>'+esc(p.reference||'—')+'</td><td>'+esc(p.status)+'</td><td><button class="btn secondary" data-print-fee="'+esc(p.id)+'">Print Receipt</button> <button class="btn secondary" data-whatsapp-fee="'+esc(p.id)+'">Send WhatsApp</button></td></tr>';}).join('')+'</tbody></table></div>';
@@ -1147,32 +1189,31 @@ document.querySelectorAll('[data-tab]').forEach(button => {
 /* SAVE ADMISSION */
 $('adSave').onclick = async () => {
   const name = $('adName').value.trim();
-  const code = $('adCode').value.trim();
   const cls = $('adClass').value;
   const board = $('adBoard').value;
   const section = sectionFor(cls, board);
 
   const grade = Number(String(cls).replace(/\D/g, ''));
   const seniorClass = grade === 11 || grade === 12;
-  if (!name || !code || !cls || !board || (!section && !seniorClass)) {
+  if (!name || !cls || !board || (!section && !seniorClass)) {
     return msg(
       'dashMsg',
-      'Enter student name, code, class and a valid board/section combination.',
+      'Enter student name, class and a valid board/section combination.',
       true
     );
   }
 
-  const subjects = [...new Set($('adSubjects').value
-    .split(',')
-    .map(x => x.trim())
-    .filter(Boolean))];
+  const subjectChoices = ['Spoken English','Hindi','Physics','Chemistry','Biology','Mathematics','Computer Science'];
+  const selectedSubjects = [...$('adSubjects').selectedOptions].map(option => option.value);
+  const subjects = selectedSubjects.includes('__ALL__')
+    ? subjectChoices
+    : [...new Set(selectedSubjects.filter(Boolean))];
   if (grade >= 9 && grade <= 12 && subjects.length === 0) {
     return msg('dashMsg', 'Enter at least one subject for Classes 9–12.', true);
   }
 
   const row = {
     full_name: name,
-    student_code: code,
     class_name: cls,
     board_name: board,
     section_name: section || null,
@@ -1193,9 +1234,11 @@ $('adSave').onclick = async () => {
     msg('dashMsg', 'Admission saved successfully.');
 
     [
-      'adName', 'adCode', 'adDob', 'adGuardian',
-      'adPhone', 'adSubjects', 'adAddress', 'adPrevious'
+      'adName', 'adDob', 'adGuardian',
+      'adPhone', 'adAddress', 'adPrevious'
     ].forEach(id => $(id).value = '');
+    [...$('adSubjects').options].forEach(option => option.selected = false);
+    $('adCode').value = 'FSA — Generated automatically';
 
     $('adBoard').value = '';
     $('adSection').value = '';
