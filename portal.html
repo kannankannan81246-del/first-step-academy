@@ -1388,7 +1388,8 @@ async function loadStaff() {
     }
     subjectSelect.innerHTML = '<option value="">No Subject (Classes 1–8)</option>' +
       choices.sort((a,b)=>a.localeCompare(b)).map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
-    subjectSelect.value = '';
+    const activeAssignment=group.startsWith('TEACH:')?staffTeachingAssignments.find(a=>'TEACH:'+a.id===group):null;
+    subjectSelect.value = activeAssignment ? activeAssignment.subject_name : '';
   };
   renderSubjectOptions();
   $('classSelect').onchange = () => {
@@ -1417,7 +1418,8 @@ $('loadRoster').onclick = async () => {
     const selectedDate=$('classDate').value;
     if(!selectedDate)return msg('dashMsg','Select the attendance date first.',true);
     const weekday=new Date(selectedDate+'T12:00:00').getDay()||7;
-    if(weekday!==teachingAssignment.day_of_week)return msg('dashMsg','This class is scheduled for '+dayNames[teachingAssignment.day_of_week]+'. Choose a matching attendance date.',true);
+    const weekdayNames=['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    if(weekday!==teachingAssignment.day_of_week)return msg('dashMsg','This class is scheduled for '+weekdayNames[teachingAssignment.day_of_week]+'. Choose a matching attendance date.',true);
   }
 
   let query = db.from('student_roster')
