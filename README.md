@@ -14,8 +14,12 @@ A static HTML/CSS/JavaScript website with a Supabase-backed academy portal.
 ## Current portal capabilities
 - Admin admissions and student board/section management
 - Staff attendance and student attendance
-- Subject-based attendance for Classes 9–12
-- Section-based staff assignments, plus additional cross-section class-and-subject assignments for Classes 9–10 with weekday scheduling (e.g. CBSE Section D Social Science)
+- Attendance sections: CBSE Sections A (Classes 1–5), B (6–8), D (Class 9), E (Class 10); State Board Section C (Classes 6–10)
+- Separate Spoken English and Hindi attendance categories
+- CBSE Classes 9 and 10 require a subject; CBSE Classes 11 and 12 use class + subject only, without sections
+- Admin-controlled staff attendance permissions: assigned sections only or all Sections A–E
+- Monthly Excel workbook with separate worksheets for Sections A–E, Spoken English, Hindi and CBSE Classes 11–12
+- Additional cross-section class-and-subject assignments for Classes 9–10 with weekday scheduling (e.g. CBSE Section D Class 9 / Section E Class 10 Social Science)
 - Subject-specific access for Classes 11–12
 - Student and staff dashboards, class attendance, admin-only RFID IN/OUT attendance, notices, achievements and gallery
 - Notices and student achievements
@@ -45,6 +49,7 @@ For an existing project that already has the portal tables:
 - `supabase/subject-attendance-migration.sql` adds subject-based attendance and senior roster access to an existing portal setup.
 - `supabase/fee-rfid-admin-migration.sql` safely adds the fee and RFID tables plus isolated admin-only demo fee records to an existing portal project. It does not import sample students into `public.students` or sample payments into the live payment ledger.
 - `supabase/cross-section-subject-assignments.sql` adds admin-managed cross-section class/subject timetable assignments and matching staff roster/attendance access rules.
+- `supabase/attendance_sections_access_and_reporting.sql` adds Section E, staff attendance access modes, the final section/subject RLS rules and monthly report access.
 
 The SQL scripts are idempotent where practical, but always take a backup before applying schema or policy changes to a live project.
 
